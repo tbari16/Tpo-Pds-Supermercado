@@ -1,0 +1,462 @@
+# Context Prompt for Backend Development — E-Market Supermarket (University Project)
+
+## Project Overview
+
+You are helping me build the backend of a university project called **E-Market**, an online supermarket e-commerce application. This is an academic project (TPO) for the subject "Software Development Process" at UADE, Argentina.
+
+The backend must be built with:
+- **Java + Spring Boot**
+- **Spring Data JPA + Hibernate**
+- **MySQL** as the relational database
+- **JWT** for authentication and authorization
+- **Layered architecture**: Controllers, Services, Repositories, Entities/Models, DTOs, Exceptions
+
+The project has a React + Vite frontend that will consume the REST API, but you only need to help with the backend.
+
+---
+
+## Architecture and Folder Structure
+
+The project must follow this package structure:
+
+```
+com.emarket
+├── controllers        → REST controllers, no business logic here, only delegation to services
+├── services           → Business logic, design patterns live here and in domain
+├── repositories       → Spring Data JPA interfaces
+├── domain             → Pure domain classes (State pattern objects, Strategy objects, Observer objects)
+├── entities           → JPA entities mapped to database tables
+├── dto                → Data Transfer Objects for request/response
+├── exceptions         → Custom domain exceptions
+├── config             → Spring Security config, JWT config, Bean declarations
+└── factory            → Factory classes (MetodoPagoFactory)
+```
+
+**Critical rule**: Controllers must never contain business logic. They receive HTTP requests, validate input via DTOs, and delegate everything to services. Services contain all business logic and orchestrate domain objects.
+
+---
+
+## Domain Entities (JPA)
+
+These are the entities that must be mapped to database tables:
+
+### Usuario (abstract, mapped with @Inheritance)
+- id: Long
+- nombre: String
+- apellido: String
+- email: String (unique)
+- passwordHash: String
+- rol: RolUsuario (enum: CLIENTE, ADMINISTRADOR)
+- activo: boolean
+- fechaRegistro: LocalDateTime
+
+### Cliente extends Usuario
+- direccionEnvio: String
+- telefono: String
+- carrito: Carrito (OneToOne)
+- pedidos: List\<Pedido\> (OneToMany)
+
+### Administrador extends Usuario
+- legajo: String
+
+### Producto
+- id: Long
+- nombre: String
+- descripcion: String
+- precio: BigDecimal
+- stock: int
+- unidad: UnidadMedida (enum: UNIDAD, KG, LT, GR)
+- imagenUrl: String
+- activo: boolean
+- categoria: CategoriaComponente (ManyToOne)
+
+Domain methods (not delegated to service):
+- tieneStock(cantidad: int): boolean
+- reducirStock(cantidad: int): void → throws InsufficientStockException if stock < cantidad
+- aumentarStock(cantidad: int): void
+
+### CategoriaComponente (abstract, mapped with @Inheritance)
+- id: Long
+- nombre: String
+- descripcion: String
+
+### CategoriaHoja extends CategoriaComponente
+- productos: List\<Producto\> (OneToMany)
+
+Methods:
+- listarProductos(): List\<Producto\>
+- calcularCantidadProductos(): int
+- esHoja(): boolean → returns true
+
+### CategoriaCompuesta extends CategoriaComponente
+- subcategorias: List\<CategoriaComponente\> (OneToMany, self-referential)
+
+Methods:
+- listarProductos(): List\<Producto\> → delegates to all children recursively
+- calcularCantidadProductos(): int → sum of all children recursively
+- esHoja(): boolean → returns false
+- agregar(c: CategoriaComponente): void
+- eliminar(c: CategoriaComponente): void
+
+### Carrito
+- id: Long
+- cliente: Cliente (OneToOne)
+- items: List\<CarritoItem\> (OneToMany, cascade)
+
+Domain methods:
+- agregarProducto(producto, cantidad): void
+- modificarCantidad(producto, cantidad): void
+- eliminarProducto(producto): void
+- calcularTotal(): BigDecimal
+- estaVacio(): boolean
+- vaciar(): void
+
+### CarritoItem
+- id: Long
+- producto: Producto (ManyToOne)
+- cantidad: int
+- precioUnitario: BigDecimal (captured at moment of adding)
+- calcularSubtotal(): BigDecimal
+
+### Pedido
+- id: Long
+- cliente: Cliente (ManyToOne)
+- fechaPedido: LocalDateTime
+- total: BigDecimal
+- direccionEnvio: String
+- items: List\<PedidoItem\> (OneToMany, cascade)
+- estadoEnum: EstadoPedidoEnum (persisted column: PENDIENTE, PAGADO, ENVIADO, ENTREGADO, CANCELADO)
+- estadoActual: EstadoPedido (transient — NOT persisted, reconstructed from estadoEnum on load)
+- observadores: List\<ObservadorPedido\> (transient — injected by NotificacionService)
+- metodoPago: MetodoPagoEnum
+- referenciaPago: String
+
+Domain methods:
+- pagar(): void → delegates to estadoActual.pagar(this)
+- enviar(): void → delegates to estadoActual.enviar(this)
+- entregar(): void → delegates to estadoActual.entregar(this)
+- cancelar(): void → delegates to estadoActual.cancelar(this)
+- cambiarEstado(nuevo: EstadoPedido): void → updates estadoActual AND estadoEnum, then calls notificar()
+- agregarObservador(obs): void
+- eliminarObservador(obs): void
+- notificar(): void → iterates observadores and calls actualizar()
+- calcularTotal(): BigDecimal
+
+### PedidoItem
+- id: Long
+- producto: Producto (ManyToOne)
+- cantidad: int
+- precioUnitario: BigDecimal (captured at moment of order creation)
+- subtotal: BigDecimal
+- calcularSubtotal(): BigDecimal
+
+### HistorialEstadoPedido
+- id: Long
+- pedido: Pedido (ManyToOne)
+- estadoAnterior: EstadoPedidoEnum
+- estadoNuevo: EstadoPedidoEnum
+- fechaCambio: LocalDateTime
+- administrador: Administrador (ManyToOne)
+
+### Notificacion
+- id: Long
+- usuario: Usuario (ManyToOne)
+- pedido: Pedido (ManyToOne)
+- tipo: TipoNotificacion (enum: EMAIL, SMS, PUSH)
+- mensaje: String
+- enviada: boolean
+- fechaEnvio: LocalDateTime
+
+---
+
+## Design Patterns Implementation
+
+### 1. Strategy Pattern — Payment Methods
+
+**Where**: `domain/payment/` package and `services/PagoService.java`
+
+**Structure**:
+```java
+// Strategy interface
+public interface MetodoPago {
+    ResultadoPago procesarPago(BigDecimal monto, String referenciaPedido);
+    MetodoPagoEnum getTipo();
+}
+
+// Concrete strategies — each is a @Component
+@Component public class PagoTarjetaCredito implements MetodoPago { ... }
+@Component public class PagoMercadoPago implements MetodoPago { ... }
+@Component public class PagoTransferencia implements MetodoPago { ... }
+
+// Factory — receives all strategies injected by Spring automatically
+@Component
+public class MetodoPagoFactory {
+    private final Map<MetodoPagoEnum, MetodoPago> estrategias;
+    public MetodoPagoFactory(List<MetodoPago> estrategias) {
+        this.estrategias = estrategias.stream()
+            .collect(Collectors.toMap(MetodoPago::getTipo, Function.identity()));
+    }
+    public MetodoPago crearMetodoPago(MetodoPagoEnum tipo) { ... }
+}
+
+// Context
+@Service
+public class PagoService {
+    private final MetodoPagoFactory factory;
+    public ResultadoPago ejecutarPago(MetodoPagoEnum tipo, BigDecimal monto, String ref) {
+        return factory.crearMetodoPago(tipo).procesarPago(monto, ref);
+    }
+}
+```
+
+**ResultadoPago** is a plain Java class (not an entity):
+- exitoso: boolean
+- referenciaPago: String
+- mensaje: String
+- fechaProcesamiento: LocalDateTime
+
+### 2. State Pattern — Order Lifecycle
+
+**Where**: `domain/state/` package
+
+**Structure**:
+```java
+// State interface
+public interface EstadoPedido {
+    void pagar(Pedido pedido);
+    void enviar(Pedido pedido);
+    void entregar(Pedido pedido);
+    void cancelar(Pedido pedido);
+    EstadoPedidoEnum getNombre();
+}
+
+// Concrete states — plain Java classes, NOT Spring beans, NOT JPA entities
+public class EstadoPendiente implements EstadoPedido {
+    @Override
+    public void pagar(Pedido pedido) {
+        pedido.cambiarEstado(new EstadoPagado()); // triggers state change + notification
+    }
+    @Override
+    public void cancelar(Pedido pedido) {
+        pedido.cambiarEstado(new EstadoCancelado());
+    }
+    @Override
+    public void enviar(Pedido pedido) {
+        throw new InvalidStateTransitionException("No se puede enviar un pedido pendiente");
+    }
+    @Override
+    public void entregar(Pedido pedido) {
+        throw new InvalidStateTransitionException("No se puede entregar un pedido pendiente");
+    }
+}
+// EstadoPagado, EstadoEnviado, EstadoEntregado, EstadoCancelado follow same pattern
+```
+
+**Important**: `Pedido.estadoActual` is `@Transient`. When a `Pedido` is loaded from the database, the service layer reconstructs the state object from `estadoEnum` before operating:
+```java
+pedido.setEstadoActual(EstadoFactory.from(pedido.getEstadoEnum()));
+```
+
+Valid transitions:
+- PENDIENTE → PAGADO or CANCELADO
+- PAGADO → ENVIADO or CANCELADO
+- ENVIADO → ENTREGADO
+- ENTREGADO → no transitions allowed
+- CANCELADO → no transitions allowed
+
+### 3. Observer Pattern — Notifications
+
+**Where**: `domain/observer/` package and `services/NotificacionService.java`
+
+**Structure**:
+```java
+// Observable interface (subject)
+public interface Observable {
+    void agregarObservador(ObservadorPedido obs);
+    void eliminarObservador(ObservadorPedido obs);
+    void notificar();
+}
+
+// Observer interface
+public interface ObservadorPedido {
+    void actualizar(Pedido pedido, EstadoPedidoEnum nuevoEstado);
+}
+
+// Concrete observers — each is a @Component
+@Component public class EmailObservador implements ObservadorPedido { ... }
+@Component public class SMSObservador implements ObservadorPedido { ... }
+@Component public class PushObservador implements ObservadorPedido { ... }
+```
+
+`Pedido` implements `Observable`. The `observadores` list is `@Transient`.
+`NotificacionService` is responsible for injecting the observers into a `Pedido` before state changes occur, and for persisting `Notificacion` entities after notification.
+
+### 4. Composite Pattern — Category Catalog
+
+**Where**: `entities/CategoriaComponente.java`, `entities/CategoriaHoja.java`, `entities/CategoriaCompuesta.java`
+
+Use JPA `@Inheritance(strategy = InheritanceType.JOINED)` for the hierarchy.
+`CategoriaCompuesta` has a `@OneToMany` self-referential relationship to `CategoriaComponente`.
+`Producto` has `@ManyToOne` to `CategoriaComponente`.
+
+The key behavior is that `listarProductos()` on a `CategoriaCompuesta` recursively collects products from all its children, treating leaves and composites uniformly.
+
+### 5. Facade Pattern — Checkout Process
+
+**Where**: `services/CheckoutFacade.java`
+
+```java
+@Service
+public class CheckoutFacade {
+    // Injects: PagoService, NotificacionService, CarritoService, PedidoService
+    
+    public Pedido confirmarCompra(Cliente cliente, MetodoPagoEnum tipoPago, String direccionEnvio) {
+        // 1. Validate cart is not empty
+        // 2. Validate stock for each item
+        // 3. Execute payment via PagoService
+        // 4. Create Pedido with EstadoPendiente
+        // 5. Register observers via NotificacionService
+        // 6. Trigger pagar() on pedido → changes state to PAGADO → notifies observers
+        // 7. Reduce stock for each product
+        // 8. Clear cart
+        // 9. Return pedido
+    }
+}
+```
+
+---
+
+## Services Layer
+
+### AuthService
+- registrar(nombre, apellido, email, password): ClienteDTO → creates Cliente, hashes password with BCrypt, creates associated empty Carrito
+- login(email, password): String (JWT token) → validates credentials, returns JWT
+- recuperarPassword(email): void → sends reset email (simulated)
+
+### UsuarioService
+- editarPerfil(id, nombre, apellido, telefono, direccion): ClienteDTO
+- buscarPorEmail(email): Usuario
+
+### CatalogoService
+- listarProductosActivos(): List\<ProductoDTO\>
+- buscarPorNombre(nombre): List\<ProductoDTO\>
+- buscarPorCategoria(categoriaId): List\<ProductoDTO\>
+- obtenerCategorias(): List\<CategoriaDTO\>
+
+### CarritoService
+- agregarProducto(clienteId, productoId, cantidad): CarritoDTO → calls Producto.tieneStock() before adding
+- modificarCantidad(clienteId, productoId, cantidad): CarritoDTO
+- eliminarProducto(clienteId, productoId): CarritoDTO
+- verTotal(clienteId): BigDecimal
+- verCarrito(clienteId): CarritoDTO
+
+### PedidoService
+- obtenerPedidosPorCliente(clienteId): List\<PedidoDTO\>
+- obtenerPedidoPorId(pedidoId): PedidoDTO
+- listarTodos(): List\<PedidoDTO\> → admin only
+
+### AdminService
+- altaProducto(request): ProductoDTO
+- modificarProducto(productoId, request): ProductoDTO
+- bajaProducto(productoId): void → sets activo = false (soft delete)
+- gestionarStock(productoId, cantidad): void
+- crearCategoria(nombre, descripcion, padreId): CategoriaDTO → if padreId is null creates root CategoriaCompuesta, if padreId points to CategoriaCompuesta adds as child
+- actualizarEstadoPedido(pedidoId, nuevoEstado, adminId): PedidoDTO → reconstructs state object, calls appropriate transition method, logs HistorialEstadoPedido
+
+### CheckoutFacade
+- confirmarCompra(clienteId, tipoPago, direccionEnvio): PedidoDTO
+
+### NotificacionService
+- registrarObservadores(pedido): void → injects EmailObservador, SMSObservador, PushObservador
+- persistirNotificacion(notificacion): void
+
+### PagoService
+- ejecutarPago(tipo, monto, referencia): ResultadoPago
+
+---
+
+## Security
+
+- Use Spring Security with JWT
+- Two roles: ROLE_CLIENTE and ROLE_ADMINISTRADOR
+- Public endpoints (no auth required): GET /api/catalogo/**, POST /api/auth/register, POST /api/auth/login
+- Cliente endpoints: /api/carrito/**, /api/pedidos/mis-pedidos, /api/checkout/**, /api/usuarios/perfil
+- Admin endpoints: /api/admin/**
+- Passwords hashed with BCrypt
+
+---
+
+## REST API Endpoints (suggested)
+
+```
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/recuperar-password
+
+GET    /api/catalogo/productos
+GET    /api/catalogo/productos/buscar?nombre=
+GET    /api/catalogo/productos/categoria/{categoriaId}
+GET    /api/catalogo/categorias
+
+GET    /api/carrito
+POST   /api/carrito/agregar
+PUT    /api/carrito/modificar
+DELETE /api/carrito/eliminar/{productoId}
+GET    /api/carrito/total
+
+POST   /api/checkout/confirmar
+
+GET    /api/pedidos/mis-pedidos
+GET    /api/pedidos/{pedidoId}
+
+PUT    /api/usuarios/perfil
+
+GET    /api/admin/pedidos
+PUT    /api/admin/pedidos/{pedidoId}/estado
+GET    /api/admin/productos
+POST   /api/admin/productos
+PUT    /api/admin/productos/{productoId}
+DELETE /api/admin/productos/{productoId}
+PUT    /api/admin/productos/{productoId}/stock
+GET    /api/admin/categorias
+POST   /api/admin/categorias
+```
+
+---
+
+## Important Design Decisions to Respect
+
+1. **State objects are never JPA entities**. They are plain Java objects reconstructed from the `estadoEnum` column every time a `Pedido` is loaded and needs to perform a state operation.
+
+2. **Observer list in Pedido is @Transient**. Observers are Spring beans injected by `NotificacionService`, not persisted.
+
+3. **Strategy selection happens at runtime**. `MetodoPagoFactory` uses a Map built from Spring-injected beans, so adding a new payment method only requires creating a new `@Component` that implements `MetodoPago`.
+
+4. **Composite recursion is in domain methods**. `CategoriaCompuesta.listarProductos()` calls `listarProductos()` on each child, letting the tree resolve itself. Services should not reproduce this recursion.
+
+5. **Controllers only delegate**. No `if` statements for business logic in controllers. Input validation via `@Valid` and DTOs only.
+
+6. **Soft delete for products**. `bajaProducto()` sets `activo = false`, never deletes from database. `CatalogoService` always filters by `activo = true`.
+
+7. **Repositories are the only DIP bridge**. Services depend on Repository interfaces (Spring Data JPA), never directly on entity constructors for persistence operations. This respects Dependency Inversion even though Repositories are not shown in the class diagram.
+
+8. **Price capture on cart and order creation**. `CarritoItem.precioUnitario` and `PedidoItem.precioUnitario` capture the product price at the moment of adding, not a reference to the current price. This prevents price changes from affecting existing carts or orders.
+
+---
+
+## What to Help Me Build
+
+I will share with you:
+1. The class diagram (Mermaid file) showing all entities, relationships, and pattern structure
+2. The TPO assignment PDF with all functional requirements and use cases
+
+Based on all of the above context, help me build the backend step by step, starting with:
+1. Spring Boot project setup (pom.xml dependencies)
+2. JPA entities
+3. Repository interfaces
+4. Domain classes (State, Strategy, Observer objects)
+5. Service layer
+6. Controllers and DTOs
+7. Security configuration
+
+Always remind me of the design patterns being applied when writing each class, and flag immediately if any code would violate SOLID principles, GRASP principles, or the design decisions listed above.
