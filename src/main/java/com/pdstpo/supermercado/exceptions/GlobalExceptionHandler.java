@@ -21,6 +21,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, exception.getMessage());
     }
 
+    @ExceptionHandler(PaymentRejectedException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentRejected(PaymentRejectedException exception) {
+        return buildResponse(HttpStatus.PAYMENT_REQUIRED, exception.getMessage());
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
