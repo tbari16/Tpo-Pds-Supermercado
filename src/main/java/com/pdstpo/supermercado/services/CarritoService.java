@@ -83,7 +83,7 @@ public class CarritoService {
         return obtenerCarrito(clienteId).calcularTotal();
     }
 
-    private Carrito obtenerCarrito(Long clienteId) {
+    public Carrito obtenerCarrito(Long clienteId) {
         return carritoRepository.findByClienteId(clienteId)
                 .orElseGet(() -> crearCarritoParaCliente(clienteId));
     }
