@@ -26,6 +26,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.PAYMENT_REQUIRED, exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidStateTransitionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidStateTransition(InvalidStateTransitionException exception) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage());
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
