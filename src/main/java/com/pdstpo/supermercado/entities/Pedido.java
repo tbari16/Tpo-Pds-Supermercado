@@ -1,5 +1,7 @@
 package com.pdstpo.supermercado.entities;
 
+import com.pdstpo.supermercado.domain.observer.Observable;
+import com.pdstpo.supermercado.domain.observer.ObservadorPedido;
 import com.pdstpo.supermercado.domain.state.EstadoFactory;
 import com.pdstpo.supermercado.domain.state.EstadoPedido;
 import jakarta.persistence.CascadeType;
@@ -20,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-public class Pedido {
+public class Pedido implements Observable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,6 +49,9 @@ public class Pedido {
 
     @Transient
     private EstadoPedido estadoActual = EstadoFactory.from(EstadoPedidoEnum.PENDIENTE);
+
+    @Transient
+    private List<ObservadorPedido> observadores = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     private MetodoPagoEnum metodoPago;
@@ -102,8 +107,21 @@ public class Pedido {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    @Override
+    public void agregarObservador(ObservadorPedido observador) {
+        if (!observadores.contains(observador)) {
+            observadores.add(observador);
+        }
+    }
+
+    @Override
+    public void eliminarObservador(ObservadorPedido observador) {
+        observadores.remove(observador);
+    }
+
+    @Override
     public void notificar() {
-        // Observer se integra en la siguiente sesion.
+        observadores.forEach(observador -> observador.actualizar(this, estadoEnum));
     }
 
     public Long getId() {
