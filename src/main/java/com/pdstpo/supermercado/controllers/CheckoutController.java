@@ -2,12 +2,13 @@ package com.pdstpo.supermercado.controllers;
 
 import com.pdstpo.supermercado.dto.ConfirmarCompraRequest;
 import com.pdstpo.supermercado.dto.PedidoResponse;
+import com.pdstpo.supermercado.security.UsuarioDetails;
 import com.pdstpo.supermercado.services.CheckoutFacade;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,8 +23,8 @@ public class CheckoutController {
 
     @PostMapping("/confirmar")
     public PedidoResponse confirmarCompra(
-            @RequestParam Long clienteId,
+            @AuthenticationPrincipal UsuarioDetails usuario,
             @Valid @RequestBody ConfirmarCompraRequest request) {
-        return checkoutFacade.confirmarCompra(clienteId, request);
+        return checkoutFacade.confirmarCompra(usuario.getId(), request);
     }
 }

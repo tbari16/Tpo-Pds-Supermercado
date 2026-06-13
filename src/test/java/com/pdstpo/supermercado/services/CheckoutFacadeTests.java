@@ -51,6 +51,6 @@ class CheckoutFacadeTests {
         assertThat(pedido.referenciaPago()).isEqualTo("MP-PED-" + pedido.id());
         assertThat(productoDespues.getStock()).isEqualTo(stockInicial - 2);
         assertThat(carritoService.verCarrito(clienteId).items()).isEmpty();
-        assertThat(notificacionRepository.findByUsuarioIdOrderByFechaEnvioDesc(clienteId)).hasSize(3);
+        assertThat(notificacionRepository.findByPedidoId(pedido.id())).hasSize(3);
     }
 }

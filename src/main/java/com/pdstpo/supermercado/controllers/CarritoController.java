@@ -3,6 +3,7 @@ package com.pdstpo.supermercado.controllers;
 import com.pdstpo.supermercado.dto.AgregarCarritoRequest;
 import com.pdstpo.supermercado.dto.CarritoResponse;
 import com.pdstpo.supermercado.dto.ModificarCantidadRequest;
+import com.pdstpo.supermercado.security.UsuarioDetails;
 import com.pdstpo.supermercado.services.CarritoService;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -15,9 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/carrito")
@@ -30,40 +31,40 @@ public class CarritoController {
     }
 
     @GetMapping
-    public CarritoResponse verCarrito(@RequestParam Long clienteId) {
-        return carritoService.verCarrito(clienteId);
+    public CarritoResponse verCarrito(@AuthenticationPrincipal UsuarioDetails usuario) {
+        return carritoService.verCarrito(usuario.getId());
     }
 
     @PostMapping("/items")
     public CarritoResponse agregarProducto(
-            @RequestParam Long clienteId,
+            @AuthenticationPrincipal UsuarioDetails usuario,
             @Valid @RequestBody AgregarCarritoRequest request) {
-        return carritoService.agregarProducto(clienteId, request);
+        return carritoService.agregarProducto(usuario.getId(), request);
     }
 
     @PutMapping("/items/{productoId}")
     public CarritoResponse modificarCantidad(
-            @RequestParam Long clienteId,
+            @AuthenticationPrincipal UsuarioDetails usuario,
             @PathVariable Long productoId,
             @Valid @RequestBody ModificarCantidadRequest request) {
-        return carritoService.modificarCantidad(clienteId, productoId, request);
+        return carritoService.modificarCantidad(usuario.getId(), productoId, request);
     }
 
     @DeleteMapping("/items/{productoId}")
     public CarritoResponse eliminarProducto(
-            @RequestParam Long clienteId,
+            @AuthenticationPrincipal UsuarioDetails usuario,
             @PathVariable Long productoId) {
-        return carritoService.eliminarProducto(clienteId, productoId);
+        return carritoService.eliminarProducto(usuario.getId(), productoId);
     }
 
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void vaciarCarrito(@RequestParam Long clienteId) {
-        carritoService.vaciarCarrito(clienteId);
+    public void vaciarCarrito(@AuthenticationPrincipal UsuarioDetails usuario) {
+        carritoService.vaciarCarrito(usuario.getId());
     }
 
     @GetMapping("/total")
-    public Map<String, BigDecimal> verTotal(@RequestParam Long clienteId) {
-        return Map.of("total", carritoService.verTotal(clienteId));
+    public Map<String, BigDecimal> verTotal(@AuthenticationPrincipal UsuarioDetails usuario) {
+        return Map.of("total", carritoService.verTotal(usuario.getId()));
     }
 }

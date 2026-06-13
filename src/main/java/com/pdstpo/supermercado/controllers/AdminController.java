@@ -1,14 +1,18 @@
 package com.pdstpo.supermercado.controllers;
 
+import com.pdstpo.supermercado.dto.ActualizarEstadoPedidoRequest;
 import com.pdstpo.supermercado.dto.CategoriaRequest;
 import com.pdstpo.supermercado.dto.CategoriaResponse;
+import com.pdstpo.supermercado.dto.PedidoResponse;
 import com.pdstpo.supermercado.dto.ProductoRequest;
 import com.pdstpo.supermercado.dto.ProductoResponse;
 import com.pdstpo.supermercado.dto.StockRequest;
+import com.pdstpo.supermercado.security.UsuarioDetails;
 import com.pdstpo.supermercado.services.AdminService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -76,5 +80,18 @@ public class AdminController {
             @PathVariable Long categoriaId,
             @Valid @RequestBody CategoriaRequest request) {
         return adminService.actualizarCategoria(categoriaId, request);
+    }
+
+    @GetMapping("/pedidos")
+    public List<PedidoResponse> listarPedidos() {
+        return adminService.listarPedidos();
+    }
+
+    @PutMapping("/pedidos/{pedidoId}/estado")
+    public PedidoResponse actualizarEstadoPedido(
+            @PathVariable Long pedidoId,
+            @AuthenticationPrincipal UsuarioDetails usuario,
+            @Valid @RequestBody ActualizarEstadoPedidoRequest request) {
+        return adminService.actualizarEstadoPedido(pedidoId, request, usuario.getId());
     }
 }

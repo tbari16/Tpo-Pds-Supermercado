@@ -1,11 +1,13 @@
 package com.pdstpo.supermercado.config;
 
+import com.pdstpo.supermercado.entities.Administrador;
 import com.pdstpo.supermercado.entities.CategoriaCompuesta;
 import com.pdstpo.supermercado.entities.CategoriaHoja;
 import com.pdstpo.supermercado.entities.Carrito;
 import com.pdstpo.supermercado.entities.Cliente;
 import com.pdstpo.supermercado.entities.Producto;
 import com.pdstpo.supermercado.entities.UnidadMedida;
+import com.pdstpo.supermercado.repositories.AdministradorRepository;
 import com.pdstpo.supermercado.repositories.CategoriaComponenteRepository;
 import com.pdstpo.supermercado.repositories.ClienteRepository;
 import com.pdstpo.supermercado.repositories.ProductoRepository;
@@ -13,6 +15,7 @@ import java.math.BigDecimal;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 public class DataInitializer {
@@ -21,7 +24,9 @@ public class DataInitializer {
     CommandLineRunner cargarDatosIniciales(
             CategoriaComponenteRepository categoriaRepository,
             ProductoRepository productoRepository,
-            ClienteRepository clienteRepository) {
+            ClienteRepository clienteRepository,
+            AdministradorRepository administradorRepository,
+            PasswordEncoder passwordEncoder) {
         return args -> {
             if (categoriaRepository.count() == 0 && productoRepository.count() == 0) {
                 CategoriaCompuesta alimentos = new CategoriaCompuesta("Alimentos", "Productos alimenticios");
@@ -63,11 +68,21 @@ public class DataInitializer {
                         "Juan",
                         "Perez",
                         "juan@email.com",
-                        "password-demo",
+                        passwordEncoder.encode("password-demo"),
                         "Av. Corrientes 1234",
                         "1122334455");
                 cliente.asignarCarrito(new Carrito());
                 clienteRepository.save(cliente);
+            }
+
+            if (administradorRepository.count() == 0) {
+                Administrador administrador = new Administrador(
+                        "Admin",
+                        "Demo",
+                        "admin@email.com",
+                        passwordEncoder.encode("password-demo"),
+                        "ADM-001");
+                administradorRepository.save(administrador);
             }
         };
     }
