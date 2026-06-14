@@ -26,7 +26,9 @@ public class PedidoController {
     }
 
     @GetMapping("/{pedidoId}")
-    public PedidoResponse obtenerPedido(@PathVariable Long pedidoId) {
-        return pedidoService.obtenerPedidoPorId(pedidoId);
+    public PedidoResponse obtenerPedido(
+            @PathVariable Long pedidoId,
+            @AuthenticationPrincipal UsuarioDetails usuario) {
+        return pedidoService.obtenerPedidoParaUsuario(pedidoId, usuario.getId(), usuario.getRol());
     }
 }

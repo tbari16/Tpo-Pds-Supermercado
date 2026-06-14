@@ -2,6 +2,8 @@ package com.pdstpo.supermercado.services;
 
 import com.pdstpo.supermercado.dto.PedidoResponse;
 import com.pdstpo.supermercado.entities.Pedido;
+import com.pdstpo.supermercado.entities.RolUsuario;
+import com.pdstpo.supermercado.exceptions.ForbiddenOperationException;
 import com.pdstpo.supermercado.exceptions.ResourceNotFoundException;
 import com.pdstpo.supermercado.repositories.PedidoRepository;
 import java.util.List;
@@ -28,6 +30,15 @@ public class PedidoService {
     @Transactional(readOnly = true)
     public PedidoResponse obtenerPedidoPorId(Long pedidoId) {
         Pedido pedido = obtenerPedido(pedidoId);
+        return PedidoResponse.from(pedido);
+    }
+
+    @Transactional(readOnly = true)
+    public PedidoResponse obtenerPedidoParaUsuario(Long pedidoId, Long usuarioId, RolUsuario rol) {
+        Pedido pedido = obtenerPedido(pedidoId);
+        if (RolUsuario.CLIENTE.equals(rol) && !pedido.getCliente().getId().equals(usuarioId)) {
+            throw new ForbiddenOperationException("No podes consultar pedidos de otro cliente");
+        }
         return PedidoResponse.from(pedido);
     }
 

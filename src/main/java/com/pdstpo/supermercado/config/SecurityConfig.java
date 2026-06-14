@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/carrito/**").hasRole("CLIENTE")
                         .requestMatchers("/api/checkout/**").hasRole("CLIENTE")
+                        .requestMatchers("/api/usuarios/perfil").hasRole("CLIENTE")
                         .requestMatchers(HttpMethod.GET, "/api/notificaciones/**").hasRole("CLIENTE")
                         .requestMatchers(HttpMethod.GET, "/api/pedidos/mis-pedidos").hasRole("CLIENTE")
                         .requestMatchers(HttpMethod.GET, "/api/pedidos/**").authenticated()
