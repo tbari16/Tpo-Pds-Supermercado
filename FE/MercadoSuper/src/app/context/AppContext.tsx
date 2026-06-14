@@ -9,7 +9,7 @@ import {
   setAuthToken,
   removeAuthToken,
 } from '../../lib/api';
-
+ 
 export type User = {
   id: string;
   email: string;
@@ -17,14 +17,14 @@ export type User = {
   lastName: string;
   role: 'CLIENT' | 'ADMIN';
 };
-
+ 
 export type Product = {
   id: string;
   name: string;
   description: string;
   price: number;
   stock: number;
-  unit: 'KG' | 'LITRO' | 'UNIDAD';
+  unit: 'UNIDAD' | 'KG' | 'LT' | 'GR';
   weight?: number;
   imageUrl: string;
   categoryId: string;
@@ -32,15 +32,15 @@ export type Product = {
   active: boolean;
   dateAdded: string;
 };
-
+ 
 export type CartItem = {
   product: Product;
   quantity: number;
 };
-
-export type OrderStatus = 'PENDIENTE' | 'CONFIRMADO' | 'ENVIADO' | 'ENTREGADO' | 'CANCELADO';
-export type PaymentMethod = 'TRANSFERENCIA' | 'TARJETA' | 'EFECTIVO';
-
+ 
+export type OrderStatus = 'PENDIENTE' | 'PAGADO' | 'ENVIADO' | 'ENTREGADO' | 'CANCELADO';
+export type PaymentMethod = 'TARJETA_CREDITO' | 'MERCADO_PAGO' | 'TRANSFERENCIA';
+ 
 export type Order = {
   id: string;
   userId: string;
@@ -54,7 +54,7 @@ export type Order = {
   createdAt: string;
   updatedAt: string;
 };
-
+ 
 export type Address = {
   street: string;
   city: string;
@@ -63,7 +63,7 @@ export type Address = {
   country: string;
   notes?: string;
 };
-
+ 
 export type Notification = {
   id: string;
   message: string;
@@ -71,7 +71,7 @@ export type Notification = {
   read: boolean;
   timestamp: string;
 };
-
+ 
 export type Category = {
   id: string;
   name: string;
@@ -80,7 +80,7 @@ export type Category = {
   active: boolean;
   productCount: number;
 };
-
+ 
 type AppContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
@@ -105,9 +105,9 @@ type AppContextType = {
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 };
-
+ 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
+ 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -116,22 +116,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-
+ 
   // Initialize: load user from localStorage and fetch data
   useEffect(() => {
     initializeApp();
   }, []);
-
+ 
   const initializeApp = async () => {
     try {
       // Check if user is already logged in
       const token = localStorage.getItem('auth_token');
       const userData = localStorage.getItem('user_data');
-      
       if (token && userData) {
         setUser(JSON.parse(userData));
       }
-
+ 
       // Fetch products and categories
       await Promise.all([loadProducts(), loadCategories()]);
     } catch (error) {
@@ -142,11 +141,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   };
-
+ 
   const loadProducts = async () => {
     try {
-      const response = await productApi.list({ page: 0, size: 100 });
-      const mappedProducts: Product[] = response.content.map((p: any) => ({
+      const response = await productApi.list();
+      const mappedProducts: Product[] = response.map((p: any) => ({
         id: String(p.id),
         name: p.nombre,
         description: p.descripcion,
@@ -155,10 +154,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         unit: p.unidad,
         weight: p.peso,
         imageUrl: p.imagenUrl || 'https://via.placeholder.com/400',
-        categoryId: String(p.categoria?.id || ''),
-        categoryName: p.categoria?.nombre || '',
+        categoryId: String(p.categoriaId || ''),
+        categoryName: p.categoriaNombre || '',
         active: p.activo,
-        dateAdded: p.fechaCreacion,
+        dateAdded: p.fechaCreacion || new Date().toISOString(),
       }));
       setProducts(mappedProducts);
     } catch (error) {
@@ -167,7 +166,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       initializeMockData();
     }
   };
-
+ 
   const loadCategories = async () => {
     try {
       const response = await categoryApi.list();
@@ -185,24 +184,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       initializeMockData();
     }
   };
-
+ 
   const loadCart = async () => {
     try {
       const response = await cartApi.get();
       const mappedCart: CartItem[] = response.items.map((item: any) => ({
         product: {
-          id: String(item.producto.id),
-          name: item.producto.nombre,
-          description: item.producto.descripcion,
-          price: item.producto.precio,
-          stock: item.producto.stock,
-          unit: item.producto.unidad,
-          weight: item.producto.peso,
-          imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
-          categoryId: String(item.producto.categoria?.id || ''),
-          categoryName: item.producto.categoria?.nombre || '',
-          active: item.producto.activo,
-          dateAdded: item.producto.fechaCreacion,
+          id: String(item.productoId),
+          name: item.productoNombre,
+          description: '',
+          price: item.precioUnitario,
+          stock: 0,
+          unit: 'UNIDAD',
+          imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
+          categoryId: '',
+          categoryName: '',
+          active: true,
+          dateAdded: new Date().toISOString(),
         },
         quantity: item.cantidad,
       }));
@@ -211,28 +209,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to load cart:', error);
     }
   };
-
+ 
   const loadOrders = async () => {
     try {
       const response = await orderApi.getByUser();
       const mappedOrders: Order[] = response.map((o: any) => ({
         id: String(o.id),
-        userId: String(o.usuario?.id || ''),
-        userName: `${o.usuario?.nombre} ${o.usuario?.apellido}` || '',
+        userId: String(o.clienteId || ''),
+        userName: o.clienteNombre || '',
         items: o.items.map((item: any) => ({
           product: {
-            id: String(item.producto.id),
-            name: item.producto.nombre,
-            description: item.producto.descripcion,
-            price: item.producto.precio,
-            stock: item.producto.stock,
-            unit: item.producto.unidad,
-            weight: item.producto.peso,
-            imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
-            categoryId: String(item.producto.categoria?.id || ''),
-            categoryName: item.producto.categoria?.nombre || '',
-            active: item.producto.activo,
-            dateAdded: item.producto.fechaCreacion,
+            id: String(item.productoId),
+            name: item.productoNombre,
+            description: '',
+            price: item.precioUnitario,
+            stock: 0,
+            unit: 'UNIDAD',
+            imageUrl: '',
+            categoryId: '',
+            categoryName: '',
+            active: true,
+            dateAdded: new Date().toISOString(),
           },
           quantity: item.cantidad,
         })),
@@ -241,22 +238,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         paymentMethod: o.metodoPago as PaymentMethod,
         paymentReference: o.referenciaPago,
         shippingAddress: {
-          street: o.direccion?.calle || '',
-          city: o.direccion?.ciudad || '',
-          state: o.direccion?.estado || '',
-          postalCode: o.direccion?.codigoPostal || '',
-          country: o.direccion?.pais || '',
-          notes: o.direccion?.notas,
+          street: o.direccionEnvio || '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: '',
         },
-        createdAt: o.fechaCreacion,
-        updatedAt: o.fechaActualizacion,
+        createdAt: o.fechaPedido,
+        updatedAt: o.fechaPedido,
       }));
       setOrders(mappedOrders);
     } catch (error) {
       console.error('Failed to load orders:', error);
     }
   };
-
+ 
   const initializeMockData = () => {
     // Mock categories
     const mockCategories: Category[] = [
@@ -267,7 +263,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       { id: '5', name: 'Bebidas', active: true, productCount: 2 },
     ];
     setCategories(mockCategories);
-
+ 
     // Mock products
     const mockProducts: Product[] = [
       {
@@ -401,7 +397,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         description: 'Leche fresca y entera, rica en calcio.',
         price: 4.49,
         stock: 200,
-        unit: 'LITRO',
+        unit: 'LT',
         imageUrl: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop',
         categoryId: '3',
         categoryName: 'Lácteos',
@@ -414,7 +410,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         description: 'Yogurt natural sin azúcar, cremoso y saludable.',
         price: 3.99,
         stock: 150,
-        unit: 'LITRO',
+        unit: 'LT',
         imageUrl: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=400&fit=crop',
         categoryId: '3',
         categoryName: 'Lácteos',
@@ -483,7 +479,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         description: 'Agua mineral natural, pura y refrescante.',
         price: 1.99,
         stock: 300,
-        unit: 'LITRO',
+        unit: 'LT',
         imageUrl: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&h=400&fit=crop',
         categoryId: '5',
         categoryName: 'Bebidas',
@@ -496,7 +492,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         description: 'Jugo de naranja natural, recién exprimido.',
         price: 5.99,
         stock: 100,
-        unit: 'LITRO',
+        unit: 'LT',
         imageUrl: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&h=400&fit=crop',
         categoryId: '5',
         categoryName: 'Bebidas',
@@ -506,26 +502,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ];
     setProducts(mockProducts);
   };
-
+ 
   const login = async (email: string, password: string) => {
     try {
       const response = await authApi.login(email, password);
-      
       // Save token
       setAuthToken(response.token);
-      
       // Map user data
       const userData: User = {
         id: String(response.usuario.id),
         email: response.usuario.email,
         firstName: response.usuario.nombre,
         lastName: response.usuario.apellido,
-        role: response.usuario.rol === 'ADMIN' ? 'ADMIN' : 'CLIENT',
+        role: response.usuario.rol === 'ADMINISTRADOR' ? 'ADMIN' : 'CLIENT',
       };
-      
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
-
+ 
       // Load user's cart and orders
       await Promise.all([loadCart(), loadOrders()]);
     } catch (error) {
@@ -543,48 +536,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('user_data', JSON.stringify(mockUser));
     }
   };
-
-  const register = async (data: { email: string; password: string; firstName: string; lastName: string }) => {
+ 
+  const register = async (data: { email: string; password: string; firstName: string; lastName: string; direccionEnvio?: string; telefono?: string }) => {
     try {
-      const response = await authApi.register(
-        data.email,
-        data.password,
-        data.firstName,
-        data.lastName
-      );
-      
+      const response = await authApi.register({
+        nombre: data.firstName,
+        apellido: data.lastName,
+        email: data.email,
+        password: data.password,
+        direccionEnvio: data.direccionEnvio || 'Sin dirección',
+        telefono: data.telefono || '',
+      });
       // Save token
       setAuthToken(response.token);
-      
       // Map user data
       const userData: User = {
         id: String(response.usuario.id),
         email: response.usuario.email,
         firstName: response.usuario.nombre,
         lastName: response.usuario.apellido,
-        role: response.usuario.rol === 'ADMIN' ? 'ADMIN' : 'CLIENT',
+        role: response.usuario.rol === 'ADMINISTRADOR' ? 'ADMIN' : 'CLIENT',
       };
-      
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
-
+ 
       // Load user's cart and orders
       await Promise.all([loadCart(), loadOrders()]);
     } catch (error) {
       console.error('Register failed:', error);
-      // Mock register for demo purposes
-      const mockUser: User = {
-        id: 'user-' + Date.now(),
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: 'CLIENT',
-      };
-      setUser(mockUser);
-      localStorage.setItem('user_data', JSON.stringify(mockUser));
+      throw error;
     }
   };
-
+ 
   const logout = async () => {
     try {
       await authApi.logout();
@@ -597,29 +580,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('user_data');
     }
   };
-
+ 
   const addToCart = async (product: Product, quantity: number) => {
     try {
       const response = await cartApi.addItem({
         productoId: Number(product.id),
         cantidad: quantity,
       });
-
+ 
       // Update local cart state
       const mappedCart: CartItem[] = response.items.map((item: any) => ({
         product: {
-          id: String(item.producto.id),
-          name: item.producto.nombre,
-          description: item.producto.descripcion,
-          price: item.producto.precio,
-          stock: item.producto.stock,
-          unit: item.producto.unidad,
-          weight: item.producto.peso,
-          imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
-          categoryId: String(item.producto.categoria?.id || ''),
-          categoryName: item.producto.categoria?.nombre || '',
-          active: item.producto.activo,
-          dateAdded: item.producto.fechaCreacion,
+          id: String(item.productoId),
+          name: item.productoNombre,
+          description: '',
+          price: item.precioUnitario,
+          stock: 0,
+          unit: 'UNIDAD',
+          imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
+          categoryId: '',
+          categoryName: '',
+          active: true,
+          dateAdded: new Date().toISOString(),
         },
         quantity: item.cantidad,
       }));
@@ -640,25 +622,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
   };
-
+ 
   const removeFromCart = async (productId: string) => {
     try {
       const response = await cartApi.removeItem(Number(productId));
-
+ 
       const mappedCart: CartItem[] = response.items.map((item: any) => ({
         product: {
-          id: String(item.producto.id),
-          name: item.producto.nombre,
-          description: item.producto.descripcion,
-          price: item.producto.precio,
-          stock: item.producto.stock,
-          unit: item.producto.unidad,
-          weight: item.producto.peso,
-          imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
-          categoryId: String(item.producto.categoria?.id || ''),
-          categoryName: item.producto.categoria?.nombre || '',
-          active: item.producto.activo,
-          dateAdded: item.producto.fechaCreacion,
+          id: String(item.productoId),
+          name: item.productoNombre,
+          description: '',
+          price: item.precioUnitario,
+          stock: 0,
+          unit: 'UNIDAD',
+          imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
+          categoryId: '',
+          categoryName: '',
+          active: true,
+          dateAdded: new Date().toISOString(),
         },
         quantity: item.cantidad,
       }));
@@ -669,30 +650,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCart((prev) => prev.filter((item) => item.product.id !== productId));
     }
   };
-
+ 
   const updateCartQuantity = async (productId: string, quantity: number) => {
     if (quantity <= 0) {
       await removeFromCart(productId);
       return;
     }
-
+ 
     try {
-      const response = await cartApi.updateItem(Number(productId), { cantidad: quantity });
-
+      const response = await cartApi.updateItem(Number(productId), quantity);
+ 
       const mappedCart: CartItem[] = response.items.map((item: any) => ({
         product: {
-          id: String(item.producto.id),
-          name: item.producto.nombre,
-          description: item.producto.descripcion,
-          price: item.producto.precio,
-          stock: item.producto.stock,
-          unit: item.producto.unidad,
-          weight: item.producto.peso,
-          imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
-          categoryId: String(item.producto.categoria?.id || ''),
-          categoryName: item.producto.categoria?.nombre || '',
-          active: item.producto.activo,
-          dateAdded: item.producto.fechaCreacion,
+          id: String(item.productoId),
+          name: item.productoNombre,
+          description: '',
+          price: item.precioUnitario,
+          stock: 0,
+          unit: 'UNIDAD',
+          imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
+          categoryId: '',
+          categoryName: '',
+          active: true,
+          dateAdded: new Date().toISOString(),
         },
         quantity: item.cantidad,
       }));
@@ -707,7 +687,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
   };
-
+ 
   const clearCart = async () => {
     try {
       await cartApi.clear();
@@ -718,44 +698,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCart([]);
     }
   };
-
+ 
   const createOrder = async (
     shippingAddress: Address,
     paymentMethod: PaymentMethod,
     paymentReference?: string
   ): Promise<Order> => {
     try {
+      // Format address as a single string
+      const direccionCompleta = `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.postalCode}, ${shippingAddress.country}`;
       const response = await checkoutApi.confirm({
-        direccionEnvio: {
-          calle: shippingAddress.street,
-          ciudad: shippingAddress.city,
-          estado: shippingAddress.state,
-          codigoPostal: shippingAddress.postalCode,
-          pais: shippingAddress.country,
-          notas: shippingAddress.notes,
-        },
         metodoPago: paymentMethod,
-        referenciaPago: paymentReference,
+        direccionEnvio: direccionCompleta,
       });
-
+ 
       const newOrder: Order = {
         id: String(response.id),
-        userId: String(response.usuario?.id || ''),
-        userName: `${response.usuario?.nombre} ${response.usuario?.apellido}` || '',
+        userId: String(response.clienteId || ''),
+        userName: response.clienteNombre || '',
         items: response.items.map((item: any) => ({
           product: {
-            id: String(item.producto.id),
-            name: item.producto.nombre,
-            description: item.producto.descripcion,
-            price: item.producto.precio,
-            stock: item.producto.stock,
-            unit: item.producto.unidad,
-            weight: item.producto.peso,
-            imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
-            categoryId: String(item.producto.categoria?.id || ''),
-            categoryName: item.producto.categoria?.nombre || '',
-            active: item.producto.activo,
-            dateAdded: item.producto.fechaCreacion,
+            id: String(item.productoId),
+            name: item.productoNombre,
+            description: '',
+            price: item.precioUnitario,
+            stock: 0,
+            unit: 'UNIDAD',
+            imageUrl: '',
+            categoryId: '',
+            categoryName: '',
+            active: true,
+            dateAdded: new Date().toISOString(),
           },
           quantity: item.cantidad,
         })),
@@ -763,21 +736,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: response.estado as OrderStatus,
         paymentMethod: response.metodoPago as PaymentMethod,
         paymentReference: response.referenciaPago,
-        shippingAddress: {
-          street: response.direccion?.calle || '',
-          city: response.direccion?.ciudad || '',
-          state: response.direccion?.estado || '',
-          postalCode: response.direccion?.codigoPostal || '',
-          country: response.direccion?.pais || '',
-          notes: response.direccion?.notas,
-        },
-        createdAt: response.fechaCreacion,
-        updatedAt: response.fechaActualizacion,
+        shippingAddress: shippingAddress,
+        createdAt: response.fechaPedido,
+        updatedAt: response.fechaPedido,
       };
-
+ 
       setOrders((prev) => [newOrder, ...prev]);
       setCart([]);
-
+ 
       return newOrder;
     } catch (error) {
       console.error('Failed to create order:', error);
@@ -796,18 +762,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-
+ 
       setOrders((prev) => [mockOrder, ...prev]);
       setCart([]);
-
+ 
       return mockOrder;
     }
   };
-
+ 
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      const response = await orderApi.updateStatus(orderId, { nuevoEstado: status });
-
+      const response = await orderApi.updateStatus(orderId, status);
+ 
       const updatedOrder: Order = {
         id: String(response.id),
         userId: String(response.usuario?.id || ''),
@@ -844,7 +810,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: response.fechaCreacion,
         updatedAt: response.fechaActualizacion,
       };
-
+ 
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? updatedOrder : o))
       );
@@ -860,7 +826,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
   };
-
+ 
   const addNotification = (data: { message: string; type: Notification['type'] }) => {
     const notification: Notification = {
       id: Date.now().toString(),
@@ -871,28 +837,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setNotifications((prev) => [notification, ...prev]);
   };
-
+ 
   const markNotificationAsRead = (id: string) => {
     setNotifications((prev) =>
       prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif))
     );
   };
-
+ 
   const addProduct = async (product: Omit<Product, 'id' | 'dateAdded'>) => {
     try {
-      const formData = new FormData();
-      formData.append('producto', JSON.stringify({
+      const requestData = {
         nombre: product.name,
         descripcion: product.description,
         precio: product.price,
         stock: product.stock,
         unidad: product.unit,
-        peso: product.weight,
+        imagenUrl: product.imageUrl || 'https://via.placeholder.com/400',
         categoriaId: Number(product.categoryId),
-        activo: product.active,
-      }));
-
-      const response = await productApi.create(formData);
+      };
+ 
+      const response = await productApi.create(requestData);
       const newProduct: Product = {
         id: String(response.id),
         name: response.nombre,
@@ -900,19 +864,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         price: response.precio,
         stock: response.stock,
         unit: response.unidad,
-        weight: response.peso,
         imageUrl: response.imagenUrl || 'https://via.placeholder.com/400',
-        categoryId: String(response.categoria?.id || ''),
-        categoryName: response.categoria?.nombre || '',
+        categoryId: String(response.categoriaId || ''),
+        categoryName: response.categoriaNombre || '',
         active: response.activo,
-        dateAdded: response.fechaCreacion,
+        dateAdded: new Date().toISOString(),
       };
-
+ 
       setProducts((prev) => [newProduct, ...prev]);
-
+ 
       setCategories((prev) =>
         prev.map((cat) =>
-          cat.id === String(response.categoria?.id)
+          cat.id === String(response.categoriaId)
             ? { ...cat, productCount: cat.productCount + 1 }
             : cat
         )
@@ -922,23 +885,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   };
-
+ 
   const updateProduct = async (id: string, product: Partial<Product>) => {
     try {
-      const formData = new FormData();
       const updateData: any = {};
       if (product.name) updateData.nombre = product.name;
       if (product.description) updateData.descripcion = product.description;
       if (product.price) updateData.precio = product.price;
       if (product.stock !== undefined) updateData.stock = product.stock;
       if (product.unit) updateData.unidad = product.unit;
-      if (product.weight !== undefined) updateData.peso = product.weight;
       if (product.categoryId) updateData.categoriaId = Number(product.categoryId);
-      if (product.active !== undefined) updateData.activo = product.active;
-
-      formData.append('producto', JSON.stringify(updateData));
-
-      const response = await productApi.update(id, formData);
+      if (product.imageUrl) updateData.imagenUrl = product.imageUrl;
+ 
+      const response = await productApi.update(id, updateData);
       const updatedProduct: Product = {
         id: String(response.id),
         name: response.nombre,
@@ -946,14 +905,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         price: response.precio,
         stock: response.stock,
         unit: response.unidad,
-        weight: response.peso,
         imageUrl: response.imagenUrl || 'https://via.placeholder.com/400',
-        categoryId: String(response.categoria?.id || ''),
-        categoryName: response.categoria?.nombre || '',
+        categoryId: String(response.categoriaId || ''),
+        categoryName: response.categoriaNombre || '',
         active: response.activo,
-        dateAdded: response.fechaCreacion,
+        dateAdded: new Date().toISOString(),
       };
-
+ 
       setProducts((prev) =>
         prev.map((p) => (p.id === id ? updatedProduct : p))
       );
@@ -962,13 +920,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   };
-
+ 
   const deleteProduct = async (id: string) => {
     try {
       await productApi.delete(id);
       const product = products.find((p) => p.id === id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
-
+ 
       if (product) {
         setCategories((prev) =>
           prev.map((cat) =>
@@ -983,14 +941,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   };
-
+ 
   const addCategory = async (category: Omit<Category, 'id' | 'productCount'>) => {
     try {
       const response = await categoryApi.create({
         nombre: category.name,
         descripcion: category.description,
       });
-
+ 
       const newCategory: Category = {
         id: String(response.id),
         name: response.nombre,
@@ -998,21 +956,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         active: response.activo,
         productCount: 0,
       };
-
+ 
       setCategories((prev) => [newCategory, ...prev]);
     } catch (error) {
       console.error('Failed to add category:', error);
       throw error;
     }
   };
-
+ 
   const updateCategory = async (id: string, category: Partial<Category>) => {
     try {
       const updateData: any = {};
       if (category.name) updateData.nombre = category.name;
       if (category.description) updateData.descripcion = category.description;
       if (category.active !== undefined) updateData.activo = category.active;
-
+ 
       const response = await categoryApi.update(id, updateData);
       const updatedCategory: Category = {
         id: String(response.id),
@@ -1021,11 +979,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         active: response.activo,
         productCount: response.productCount || 0,
       };
-
+ 
       setCategories((prev) =>
         prev.map((cat) => (cat.id === id ? updatedCategory : cat))
       );
-
+ 
       if (category.name) {
         setProducts((prev) =>
           prev.map((product) =>
@@ -1040,25 +998,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   };
-
+ 
+  // NOTE: Backend doesn't support DELETE /admin/categorias/{id} endpoint
   const deleteCategory = async (id: string) => {
-    try {
-      await categoryApi.delete(id);
-      setCategories((prev) => prev.filter((cat) => cat.id !== id));
-
-      setProducts((prev) =>
-        prev.map((product) =>
-          product.categoryId === id ? { ...product, active: false } : product
-        )
-      );
-    } catch (error) {
-      console.error('Failed to delete category:', error);
-      throw error;
-    }
+    throw new Error('Delete category is not supported by the backend');
+    // try {
+    //   await categoryApi.delete(id);
+    //   setCategories((prev) => prev.filter((cat) => cat.id !== id));
+    //
+    //   setProducts((prev) =>
+    //     prev.map((product) =>
+    //       product.categoryId === id ? { ...product, active: false } : product
+    //     )
+    //   );
+    // } catch (error) {
+    //   console.error('Failed to delete category:', error);
+    //   throw error;
+    // }
   };
-
+ 
   return (
-    <AppContext.Provider
+<AppContext.Provider
       value={{
         user,
         login,
@@ -1083,12 +1043,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateCategory,
         deleteCategory,
       }}
-    >
+>
       {children}
-    </AppContext.Provider>
+</AppContext.Provider>
   );
 }
-
+ 
 export function useApp() {
   const context = useContext(AppContext);
   if (!context) {
