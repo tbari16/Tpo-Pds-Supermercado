@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+// Mantenemos useApp por si necesitas actualizar estados globales después
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import { Check, X } from 'lucide-react';
@@ -11,10 +12,11 @@ export default function Register() {
     email: '',
     password: '',
     confirmPassword: '',
+    direccionEnvio: '', // <-- Nuevo campo obligatorio para el backend
+    telefono: '',       // <-- Nuevo campo opcional/recomendado
     termsAccepted: false,
   });
   const [loading, setLoading] = useState(false);
-  const { register } = useApp();
   const navigate = useNavigate();
 
   const passwordStrength = formData.password.length >= 6;
@@ -22,8 +24,9 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
-      toast.error('Por favor completa todos los campos');
+    // Validamos que los campos requeridos no estén vacíos, incluyendo la dirección
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.direccionEnvio) {
+      toast.error('Por favor completa todos los campos obligatorios');
       return;
     }
 
@@ -44,16 +47,44 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+      // 1. Petición POST al backend con la estructura exacta que espera Java
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombre: formData.firstName,
+          apellido: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+          rol: "CLIENTE", // Le decimos al backend qué tipo de usuario es
+          direccionEnvio: formData.direccionEnvio,
+          telefono: formData.telefono || ""
+        })
       });
+
+      // 2. Manejo de errores (ej. si el correo ya existe en la BD)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.mensaje || 'Error al crear la cuenta. Intenta con otro correo.');
+      }
+
+      // 3. Obtenemos el token que el backend nos da al registrarnos
+      const data = await response.json();
+
+      // 4. Guardamos el token para que el usuario ya quede logueado
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        if (data.usuario) {
+          localStorage.setItem('usuario', JSON.stringify(data.usuario));
+        }
+      }
+
       toast.success('Cuenta creada exitosamente');
-      navigate('/products');
-    } catch (error) {
-      toast.error('Error al crear la cuenta');
+      navigate('/products'); // Lo mandamos directo a comprar
+    } catch (error: any) {
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -61,7 +92,7 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#EFF6FF] to-[#F0FDF4] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md my-8"> {/* Agregué 'my-8' para darle margen vertical si la pantalla es pequeña */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-[#E2E8F0]">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -114,6 +145,35 @@ export default function Register() {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="tu@email.com"
+              />
+            </div>
+
+            {/* Nuevos campos para coincidir con la Base de Datos */}
+            <div>
+              <label htmlFor="direccionEnvio" className="block text-sm font-medium text-[#1E293B] mb-2">
+                Dirección de Envío
+              </label>
+              <input
+                id="direccionEnvio"
+                type="text"
+                value={formData.direccionEnvio}
+                onChange={(e) => setFormData({ ...formData, direccionEnvio: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Calle Falsa 123"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="telefono" className="block text-sm font-medium text-[#1E293B] mb-2">
+                Teléfono
+              </label>
+              <input
+                id="telefono"
+                type="tel"
+                value={formData.telefono}
+                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="1123456789"
               />
             </div>
 

@@ -1,11 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ShoppingCart, Search, SlidersHorizontal } from 'lucide-react';
+import { ShoppingCart, Search, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Products() {
-  const { products, categories, addToCart } = useApp();
+  // Quitamos 'products' del contexto, ahora vienen del backend
+  const { categories, addToCart } = useApp(); 
+  
+  // Nuevos estados para la API
+  const [apiProducts, setApiProducts] = useState<any[]>([]);
+  const [cargando, setCargando] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
@@ -13,7 +19,46 @@ export default function Products() {
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [showFilters, setShowFilters] = useState(false);
 
-  const activeProducts = products.filter((p) => p.active);
+  // --- NUEVA LÓGICA DE CONEXIÓN AL BACKEND ---
+  useEffect(() => {
+    fetch('/api/catalogo/productos')
+      .then(res => {
+        if (!res.ok) throw new Error('Error de red');
+        return res.json();
+      })
+      .then(data => {
+        // Mapeamos las propiedades del backend (español) al frontend (inglés)
+        const productosFormateados = data.map((p: any) => ({
+          id: p.id,
+          name: p.nombre,
+          description: p.descripcion,
+          price: p.precio,
+          stock: p.stock,
+          unit: p.unidad,
+          imageUrl: p.imagenUrl,
+          active: p.activo,
+          // Convertimos el ID a string para que el filtro === funcione correctamente
+          categoryId: p.categoriaId.toString(), 
+          categoryName: p.categoriaNombre
+        }));
+        
+        setApiProducts(productosFormateados);
+        
+        // Ajustamos el rango de precio máximo basado en lo que llega del backend
+        const maxPriceBackend = Math.max(...productosFormateados.map((p: any) => p.price), 100);
+        setPriceRange([0, maxPriceBackend]);
+        
+        setCargando(false);
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error('Error al cargar los productos del servidor');
+        setCargando(false);
+      });
+  }, []);
+
+  // Ahora filtramos sobre los productos que vinieron de la API
+  const activeProducts = apiProducts.filter((p) => p.active);
 
   const filteredProducts = useMemo(() => {
     return activeProducts.filter((product) => {
@@ -46,6 +91,17 @@ export default function Products() {
 
   const maxPrice = Math.max(...activeProducts.map((p) => p.price), 100);
 
+  // --- PANTALLA DE CARGA MIENTRAS ESPERA AL BACKEND ---
+  if (cargando) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-12 h-12 text-[#2563EB] animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">Cargando catálogo...</p>
+      </div>
+    );
+  }
+
+  // --- TU DISEÑO ORIGINAL INTACTO DE AQUÍ HACIA ABAJO ---
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">

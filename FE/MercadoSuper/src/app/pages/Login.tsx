@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+// Mantenemos useApp por si luego necesitas actualizar algún estado global
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 
@@ -7,7 +8,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useApp();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,16 +19,39 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await login(email, password);
+      // 1. Petición real a tu backend de Spring Boot
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      // 2. Si las credenciales no existen en H2, lanzamos error
+      if (!response.ok) {
+        throw new Error('Correo o contraseña incorrectos');
+      }
+
+      // 3. Extraemos el token y los datos del usuario
+      const data = await response.json();
+
+      // 4. Guardamos la "llave" VIP en el navegador
+      localStorage.setItem('token', data.token);
+      if (data.usuario) {
+        localStorage.setItem('usuario', JSON.stringify(data.usuario));
+      }
+
       toast.success('Sesión iniciada correctamente');
 
-      if (email.includes('admin')) {
+      // 5. Redirigimos basándonos en el rol REAL de la base de datos
+      if (data.usuario?.rol === 'ADMINISTRADOR') {
         navigate('/admin/dashboard');
       } else {
         navigate('/products');
       }
-    } catch (error) {
-      toast.error('Error al iniciar sesión');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -108,10 +131,11 @@ export default function Login() {
             </p>
           </div>
 
+          {/* Actualizamos la cajita con el usuario que creaste hace un rato para que lo pruebes rápido */}
           <div className="mt-8 p-4 bg-gradient-to-r from-[#EFF6FF] to-[#F0FDF4] rounded-xl border border-[#E2E8F0]">
-            <p className="text-sm text-[#1E293B] font-medium mb-2">Cuentas de prueba:</p>
-            <p className="text-xs text-[#64748B]">Cliente: user@test.com / password</p>
-            <p className="text-xs text-[#64748B]">Admin: admin@test.com / password</p>
+            <p className="text-sm text-[#1E293B] font-medium mb-2">Cuenta real en la Base de Datos:</p>
+            <p className="text-xs text-[#64748B]">Email: sofia@email.com</p>
+            <p className="text-xs text-[#64748B]">Password: mi_contraseña_123</p>
           </div>
         </div>
       </div>

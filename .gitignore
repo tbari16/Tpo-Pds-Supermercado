@@ -33,3 +33,9 @@ src/main/resources/application-local.properties
 
 ### VS Code ###
 .vscode/
+
+node_modules/
+dist/
+build/
+.env
+.env.local
