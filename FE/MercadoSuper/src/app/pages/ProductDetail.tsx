@@ -10,6 +10,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
 
   const product = products.find((p) => p.id === id);
+//holaaa
 
   if (!product) {
     return (
