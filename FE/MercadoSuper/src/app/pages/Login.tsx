@@ -19,7 +19,6 @@ export default function Login() {
 
     setLoading(true);
     try {
-      // 1. Petición real a tu backend de Spring Boot
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -28,28 +27,37 @@ export default function Login() {
         body: JSON.stringify({ email, password })
       });
 
-      // 2. Si las credenciales no existen en H2, lanzamos error
       if (!response.ok) {
         throw new Error('Correo o contraseña incorrectos');
       }
 
-      // 3. Extraemos el token y los datos del usuario
       const data = await response.json();
 
-      // 4. Guardamos la "llave" VIP en el navegador
-      localStorage.setItem('token', data.token);
+      // 1. Guardamos el token con el nombre EXACTO que busca AppContext
+      localStorage.setItem('auth_token', data.token);
+      
+      // 2. Mapeamos (traducimos) el usuario al formato en inglés que espera tu contexto
       if (data.usuario) {
-        localStorage.setItem('usuario', JSON.stringify(data.usuario));
+        const userData = {
+          id: String(data.usuario.id),
+          email: data.usuario.email,
+          firstName: data.usuario.nombre,
+          lastName: data.usuario.apellido,
+          role: data.usuario.rol === 'ADMINISTRADOR' ? 'ADMIN' : 'CLIENT',
+        };
+        localStorage.setItem('user_data', JSON.stringify(userData));
       }
 
       toast.success('Sesión iniciada correctamente');
 
-      // 5. Redirigimos basándonos en el rol REAL de la base de datos
+      // 3. Usamos window.location.href en lugar de navigate. 
+      // Esto recarga la página para que AppContext despierte, lea el localStorage y te deje pasar.
       if (data.usuario?.rol === 'ADMINISTRADOR') {
-        navigate('/admin/dashboard');
+        window.location.href = '/admin/dashboard';
       } else {
-        navigate('/products');
+        window.location.href = '/products';
       }
+      
     } catch (error: any) {
       toast.error(error.message || 'Error al iniciar sesión');
     } finally {
