@@ -8,11 +8,11 @@ export default function AdminCategories() {
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
+  // Adaptado al backend: Quitamos "active" del estado del formulario
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     parentId: '',
-    active: true,
   });
 
   const handleOpenModal = (category?: Category) => {
@@ -22,7 +22,6 @@ export default function AdminCategories() {
         name: category.name,
         description: category.description || '',
         parentId: category.parentId || '',
-        active: category.active,
       });
     } else {
       setEditingCategory(null);
@@ -30,7 +29,6 @@ export default function AdminCategories() {
         name: '',
         description: '',
         parentId: '',
-        active: true,
       });
     }
     setShowModal(true);
@@ -50,11 +48,11 @@ export default function AdminCategories() {
     }
 
     const categoryData = {
-      name: formData.name,
-      description: formData.description || undefined,
-      parentId: formData.parentId || undefined,
-      active: formData.active,
-    };
+  name: formData.name,
+  description: formData.description || undefined,
+  parentId: formData.parentId || undefined,
+  active: editingCategory ? editingCategory.active : true,
+};
 
     if (editingCategory) {
       updateCategory(editingCategory.id, categoryData);
@@ -233,18 +231,6 @@ export default function AdminCategories() {
                       </option>
                     ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">Categoría activa</span>
-                </label>
               </div>
 
               <div className="flex gap-4 pt-4">

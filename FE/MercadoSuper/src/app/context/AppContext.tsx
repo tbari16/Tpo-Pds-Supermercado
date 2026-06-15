@@ -117,25 +117,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
  
-  // Initialize: load user from localStorage and fetch data
   useEffect(() => {
     initializeApp();
   }, []);
  
   const initializeApp = async () => {
     try {
-      // Check if user is already logged in
       const token = localStorage.getItem('auth_token');
       const userData = localStorage.getItem('user_data');
       if (token && userData) {
         setUser(JSON.parse(userData));
       }
  
-      // Fetch products and categories
       await Promise.all([loadProducts(), loadCategories()]);
     } catch (error) {
       console.error('Failed to initialize app:', error);
-      // Use mock data as fallback
       initializeMockData();
     } finally {
       setLoading(false);
@@ -156,34 +152,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         imageUrl: p.imagenUrl || 'https://via.placeholder.com/400',
         categoryId: String(p.categoriaId || ''),
         categoryName: p.categoriaNombre || '',
-        active: p.activo,
+        active: p.activo ?? true, 
         dateAdded: p.fechaCreacion || new Date().toISOString(),
       }));
       setProducts(mappedProducts);
     } catch (error) {
       console.error('Failed to load products:', error);
-      // Use mock data as fallback
       initializeMockData();
     }
   };
  
   const loadCategories = async () => {
-    try {
-      const response = await categoryApi.list();
-      const mappedCategories: Category[] = response.map((c: any) => ({
-        id: String(c.id),
-        name: c.nombre,
-        description: c.descripcion,
-        active: c.activo,
-        productCount: c.productCount || 0,
-      }));
-      setCategories(mappedCategories);
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-      // Use mock data as fallback
-      initializeMockData();
-    }
-  };
+  try {
+    const response = await categoryApi.list();
+    console.log('📥 [loadCategories] raw response:', response);
+
+    // Función para aplanar categorías anidadas
+    const flattenCategories = (cats: any[]): Category[] => {
+      const result: Category[] = [];
+      for (const c of cats) {
+        result.push({
+          id: String(c.id),
+          name: c.nombre,
+          description: c.descripcion,
+          parentId: c.categoriaPadreId ? String(c.categoriaPadreId) : undefined, // ← era c.padreId
+          active: true,
+          productCount: c.cantidadProductos || 0, // ← era c.productCount
+        });
+        if (c.subcategorias?.length > 0) {
+          result.push(...flattenCategories(c.subcategorias)); // ← recursivo
+        }
+      }
+      return result;
+    };
+
+    const mappedCategories = flattenCategories(response);
+    console.log('✅ [loadCategories] mapeadas:', mappedCategories);
+    setCategories(mappedCategories);
+  } catch (error) {
+    console.error('Failed to load categories:', error);
+    initializeMockData();
+  }
+};
  
   const loadCart = async () => {
     try {
@@ -254,261 +264,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
  
   const initializeMockData = () => {
-    // Mock categories
-    const mockCategories: Category[] = [
-      { id: '1', name: 'Frutas', active: true, productCount: 5 },
-      { id: '2', name: 'Verduras', active: true, productCount: 4 },
-      { id: '3', name: 'Lácteos', active: true, productCount: 3 },
-      { id: '4', name: 'Carnes', active: true, productCount: 3 },
-      { id: '5', name: 'Bebidas', active: true, productCount: 2 },
-    ];
-    setCategories(mockCategories);
- 
-    // Mock products
-    const mockProducts: Product[] = [
-      {
-        id: '1',
-        name: 'Manzanas Rojas',
-        description: 'Manzanas rojas frescas y jugosas, perfectas para comer o cocinar.',
-        price: 3.99,
-        stock: 100,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400&h=400&fit=crop',
-        categoryId: '1',
-        categoryName: 'Frutas',
-        active: true,
-        dateAdded: '2026-05-01',
-      },
-      {
-        id: '2',
-        name: 'Plátanos',
-        description: 'Plátanos maduros, dulces y cremosos.',
-        price: 2.49,
-        stock: 150,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400&h=400&fit=crop',
-        categoryId: '1',
-        categoryName: 'Frutas',
-        active: true,
-        dateAdded: '2026-05-02',
-      },
-      {
-        id: '3',
-        name: 'Naranjas',
-        description: 'Naranjas frescas y jugosas, ricas en vitamina C.',
-        price: 4.99,
-        stock: 80,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?w=400&h=400&fit=crop',
-        categoryId: '1',
-        categoryName: 'Frutas',
-        active: true,
-        dateAdded: '2026-05-03',
-      },
-      {
-        id: '4',
-        name: 'Fresas',
-        description: 'Fresas frescas y dulces, perfectas para postres.',
-        price: 5.99,
-        stock: 50,
-        unit: 'KG',
-        weight: 0.5,
-        imageUrl: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400&h=400&fit=crop',
-        categoryId: '1',
-        categoryName: 'Frutas',
-        active: true,
-        dateAdded: '2026-05-04',
-      },
-      {
-        id: '5',
-        name: 'Uvas',
-        description: 'Uvas verdes sin semillas, dulces y refrescantes.',
-        price: 6.99,
-        stock: 60,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1599819177406-6859e1d03cae?w=400&h=400&fit=crop',
-        categoryId: '1',
-        categoryName: 'Frutas',
-        active: true,
-        dateAdded: '2026-05-05',
-      },
-      {
-        id: '6',
-        name: 'Tomates',
-        description: 'Tomates maduros y jugosos, perfectos para ensaladas y salsas.',
-        price: 3.49,
-        stock: 120,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1546470427-227a993b51ba?w=400&h=400&fit=crop',
-        categoryId: '2',
-        categoryName: 'Verduras',
-        active: true,
-        dateAdded: '2026-05-06',
-      },
-      {
-        id: '7',
-        name: 'Lechugas',
-        description: 'Lechugas frescas y crujientes, ideales para ensaladas.',
-        price: 2.99,
-        stock: 90,
-        unit: 'UNIDAD',
-        imageUrl: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=400&h=400&fit=crop',
-        categoryId: '2',
-        categoryName: 'Verduras',
-        active: true,
-        dateAdded: '2026-05-07',
-      },
-      {
-        id: '8',
-        name: 'Zanahorias',
-        description: 'Zanahorias frescas, dulces y crujientes.',
-        price: 2.49,
-        stock: 110,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400&h=400&fit=crop',
-        categoryId: '2',
-        categoryName: 'Verduras',
-        active: true,
-        dateAdded: '2026-05-08',
-      },
-      {
-        id: '9',
-        name: 'Brócoli',
-        description: 'Brócoli fresco, rico en nutrientes y fibra.',
-        price: 3.99,
-        stock: 70,
-        unit: 'KG',
-        weight: 0.5,
-        imageUrl: 'https://images.unsplash.com/photo-1583663848850-46af132dc08e?w=400&h=400&fit=crop',
-        categoryId: '2',
-        categoryName: 'Verduras',
-        active: true,
-        dateAdded: '2026-05-09',
-      },
-      {
-        id: '10',
-        name: 'Leche Entera',
-        description: 'Leche fresca y entera, rica en calcio.',
-        price: 4.49,
-        stock: 200,
-        unit: 'LT',
-        imageUrl: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop',
-        categoryId: '3',
-        categoryName: 'Lácteos',
-        active: true,
-        dateAdded: '2026-05-10',
-      },
-      {
-        id: '11',
-        name: 'Yogurt Natural',
-        description: 'Yogurt natural sin azúcar, cremoso y saludable.',
-        price: 3.99,
-        stock: 150,
-        unit: 'LT',
-        imageUrl: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=400&fit=crop',
-        categoryId: '3',
-        categoryName: 'Lácteos',
-        active: true,
-        dateAdded: '2026-05-11',
-      },
-      {
-        id: '12',
-        name: 'Queso Fresco',
-        description: 'Queso fresco artesanal, suave y delicioso.',
-        price: 7.99,
-        stock: 80,
-        unit: 'KG',
-        weight: 0.5,
-        imageUrl: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=400&h=400&fit=crop',
-        categoryId: '3',
-        categoryName: 'Lácteos',
-        active: true,
-        dateAdded: '2026-05-12',
-      },
-      {
-        id: '13',
-        name: 'Pollo Entero',
-        description: 'Pollo fresco y tierno, ideal para asar o guisar.',
-        price: 12.99,
-        stock: 50,
-        unit: 'KG',
-        weight: 2,
-        imageUrl: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400&h=400&fit=crop',
-        categoryId: '4',
-        categoryName: 'Carnes',
-        active: true,
-        dateAdded: '2026-05-13',
-      },
-      {
-        id: '14',
-        name: 'Carne de Res',
-        description: 'Carne de res de primera calidad, perfecta para bistecs.',
-        price: 18.99,
-        stock: 40,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1603048297172-c92544798d5a?w=400&h=400&fit=crop',
-        categoryId: '4',
-        categoryName: 'Carnes',
-        active: true,
-        dateAdded: '2026-05-14',
-      },
-      {
-        id: '15',
-        name: 'Carne de Cerdo',
-        description: 'Carne de cerdo fresca, jugosa y sabrosa.',
-        price: 14.99,
-        stock: 45,
-        unit: 'KG',
-        weight: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1602470520998-f4a52199a3d6?w=400&h=400&fit=crop',
-        categoryId: '4',
-        categoryName: 'Carnes',
-        active: true,
-        dateAdded: '2026-05-15',
-      },
-      {
-        id: '16',
-        name: 'Agua Mineral',
-        description: 'Agua mineral natural, pura y refrescante.',
-        price: 1.99,
-        stock: 300,
-        unit: 'LT',
-        imageUrl: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&h=400&fit=crop',
-        categoryId: '5',
-        categoryName: 'Bebidas',
-        active: true,
-        dateAdded: '2026-05-16',
-      },
-      {
-        id: '17',
-        name: 'Jugo de Naranja',
-        description: 'Jugo de naranja natural, recién exprimido.',
-        price: 5.99,
-        stock: 100,
-        unit: 'LT',
-        imageUrl: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&h=400&fit=crop',
-        categoryId: '5',
-        categoryName: 'Bebidas',
-        active: true,
-        dateAdded: '2026-05-17',
-      },
-    ];
-    setProducts(mockProducts);
+    setCategories([]);
+    setProducts([]);
   };
  
   const login = async (email: string, password: string) => {
     try {
       const response = await authApi.login(email, password);
-      // Save token
       setAuthToken(response.token);
-      // Map user data
       const userData: User = {
         id: String(response.usuario.id),
         email: response.usuario.email,
@@ -519,21 +282,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
  
-      // Load user's cart and orders
       await Promise.all([loadCart(), loadOrders()]);
     } catch (error) {
       console.error('Login failed:', error);
-      // Mock login for demo purposes
-      const isAdmin = email.includes('admin');
-      const mockUser: User = {
-        id: isAdmin ? 'admin-1' : 'user-' + Date.now(),
-        email,
-        firstName: isAdmin ? 'Admin' : 'Juan',
-        lastName: isAdmin ? 'Test' : 'Pérez',
-        role: isAdmin ? 'ADMIN' : 'CLIENT',
-      };
-      setUser(mockUser);
-      localStorage.setItem('user_data', JSON.stringify(mockUser));
     }
   };
  
@@ -547,9 +298,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         direccionEnvio: data.direccionEnvio || 'Sin dirección',
         telefono: data.telefono || '',
       });
-      // Save token
       setAuthToken(response.token);
-      // Map user data
       const userData: User = {
         id: String(response.usuario.id),
         email: response.usuario.email,
@@ -560,7 +309,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
  
-      // Load user's cart and orders
       await Promise.all([loadCart(), loadOrders()]);
     } catch (error) {
       console.error('Register failed:', error);
@@ -588,7 +336,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         cantidad: quantity,
       });
  
-      // Update local cart state
       const mappedCart: CartItem[] = response.items.map((item: any) => ({
         product: {
           id: String(item.productoId),
@@ -608,18 +355,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCart(mappedCart);
     } catch (error) {
       console.error('Failed to add item to cart:', error);
-      // Mock add to cart
-      setCart((prev) => {
-        const existing = prev.find((item) => item.product.id === product.id);
-        if (existing) {
-          return prev.map((item) =>
-            item.product.id === product.id
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
-        }
-        return [...prev, { product, quantity }];
-      });
     }
   };
  
@@ -646,8 +381,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCart(mappedCart);
     } catch (error) {
       console.error('Failed to remove item from cart:', error);
-      // Mock remove from cart
-      setCart((prev) => prev.filter((item) => item.product.id !== productId));
     }
   };
  
@@ -679,12 +412,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCart(mappedCart);
     } catch (error) {
       console.error('Failed to update cart quantity:', error);
-      // Mock update quantity
-      setCart((prev) =>
-        prev.map((item) =>
-          item.product.id === productId ? { ...item, quantity } : item
-        )
-      );
     }
   };
  
@@ -694,8 +421,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCart([]);
     } catch (error) {
       console.error('Failed to clear cart:', error);
-      // Mock clear cart
-      setCart([]);
     }
   };
  
@@ -705,7 +430,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     paymentReference?: string
   ): Promise<Order> => {
     try {
-      // Format address as a single string
       const direccionCompleta = `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.postalCode}, ${shippingAddress.country}`;
       const response = await checkoutApi.confirm({
         metodoPago: paymentMethod,
@@ -747,26 +471,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return newOrder;
     } catch (error) {
       console.error('Failed to create order:', error);
-      // Mock create order
-      const total = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-      const mockOrder: Order = {
-        id: 'ORD-' + Date.now(),
-        userId: user?.id || '',
-        userName: user ? `${user.firstName} ${user.lastName}` : '',
-        items: cart.map((item) => ({ product: item.product, quantity: item.quantity })),
-        total,
-        status: 'PENDIENTE',
-        paymentMethod,
-        paymentReference,
-        shippingAddress,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
- 
-      setOrders((prev) => [mockOrder, ...prev]);
-      setCart([]);
- 
-      return mockOrder;
+      throw error;
     }
   };
  
@@ -790,7 +495,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             imageUrl: item.producto.imagenUrl || 'https://via.placeholder.com/400',
             categoryId: String(item.producto.categoria?.id || ''),
             categoryName: item.producto.categoria?.nombre || '',
-            active: item.producto.activo,
+            active: item.producto.activo ?? true,
             dateAdded: item.producto.fechaCreacion,
           },
           quantity: item.cantidad,
@@ -816,14 +521,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     } catch (error) {
       console.error('Failed to update order status:', error);
-      // Mock update status
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId
-            ? { ...order, status, updatedAt: new Date().toISOString() }
-            : order
-        )
-      );
     }
   };
  
@@ -867,7 +564,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         imageUrl: response.imagenUrl || 'https://via.placeholder.com/400',
         categoryId: String(response.categoriaId || ''),
         categoryName: response.categoriaNombre || '',
-        active: response.activo,
+        active: response.activo ?? true, 
         dateAdded: new Date().toISOString(),
       };
  
@@ -908,7 +605,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         imageUrl: response.imagenUrl || 'https://via.placeholder.com/400',
         categoryId: String(response.categoriaId || ''),
         categoryName: response.categoriaNombre || '',
-        active: response.activo,
+        active: response.activo ?? true,
         dateAdded: new Date().toISOString(),
       };
  
@@ -943,82 +640,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
  
   const addCategory = async (category: Omit<Category, 'id' | 'productCount'>) => {
-    try {
-      const response = await categoryApi.create({
-        nombre: category.name,
-        descripcion: category.description,
-      });
- 
-      const newCategory: Category = {
-        id: String(response.id),
-        name: response.nombre,
-        description: response.descripcion,
-        active: response.activo,
-        productCount: 0,
-      };
- 
-      setCategories((prev) => [newCategory, ...prev]);
-    } catch (error) {
-      console.error('Failed to add category:', error);
-      throw error;
-    }
-  };
+  try {
+    console.log('📤 [addCategory] enviando:', { nombre: category.name, descripcion: category.description, padreId: category.parentId });
+    
+    await categoryApi.create({
+      nombre: category.name,
+      descripcion: category.description,
+      padreId: category.parentId ? Number(category.parentId) : null,
+      hoja: true,
+    } as any);
+
+    // En vez de usar response.id (que viene null), recargamos todo
+    await loadCategories();
+    
+  } catch (error) {
+    console.error('Failed to add category:', error);
+    throw error;
+  }
+};
  
   const updateCategory = async (id: string, category: Partial<Category>) => {
     try {
       const updateData: any = {};
+      console.log('📤 [updateCategory] id:', id, 'enviando:', updateData);
       if (category.name) updateData.nombre = category.name;
       if (category.description) updateData.descripcion = category.description;
-      if (category.active !== undefined) updateData.activo = category.active;
+      
+      // Inyectamos el padreId si se modifica y forzamos hoja a true
+      if (category.parentId !== undefined) {
+        updateData.padreId = category.parentId ? Number(category.parentId) : null;
+      }
+      updateData.hoja = true; 
  
       const response = await categoryApi.update(id, updateData);
-      const updatedCategory: Category = {
-        id: String(response.id),
-        name: response.nombre,
-        description: response.descripcion,
-        active: response.activo,
-        productCount: response.productCount || 0,
-      };
- 
-      setCategories((prev) =>
-        prev.map((cat) => (cat.id === id ? updatedCategory : cat))
-      );
- 
-      if (category.name) {
-        setProducts((prev) =>
-          prev.map((product) =>
-            product.categoryId === id
-              ? { ...product, categoryName: category.name! }
-              : product
-          )
-        );
-      }
+      await loadCategories();
     } catch (error) {
       console.error('Failed to update category:', error);
       throw error;
     }
   };
  
-  // NOTE: Backend doesn't support DELETE /admin/categorias/{id} endpoint
   const deleteCategory = async (id: string) => {
     throw new Error('Delete category is not supported by the backend');
-    // try {
-    //   await categoryApi.delete(id);
-    //   setCategories((prev) => prev.filter((cat) => cat.id !== id));
-    //
-    //   setProducts((prev) =>
-    //     prev.map((product) =>
-    //       product.categoryId === id ? { ...product, active: false } : product
-    //     )
-    //   );
-    // } catch (error) {
-    //   console.error('Failed to delete category:', error);
-    //   throw error;
-    // }
   };
  
   return (
-<AppContext.Provider
+    <AppContext.Provider
       value={{
         user,
         login,
@@ -1043,9 +710,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateCategory,
         deleteCategory,
       }}
->
+    >
       {children}
-</AppContext.Provider>
+    </AppContext.Provider>
   );
 }
  

@@ -54,9 +54,10 @@ async function fetchWithAuth(
   });
  
   if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, data, `HTTP ${response.status}`);
-  }
+  const data = await response.json().catch(() => ({}));
+  console.error('❌ API Error body:', data); 
+  throw new ApiError(response.status, data, `HTTP ${response.status}`);
+}
  
   return response;
 }
