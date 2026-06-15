@@ -129,7 +129,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(JSON.parse(userData));
       }
  
-      await Promise.all([loadProducts(), loadCategories()]);
+      if (token && userData) {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        await Promise.all([loadProducts(), loadCategories(), loadCart(), loadOrders(parsedUser.role)]);
+      } else {
+        await Promise.all([loadProducts(), loadCategories()]);
+      }
     } catch (error) {
       console.error('Failed to initialize app:', error);
       initializeMockData();
@@ -220,9 +226,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
  
-  const loadOrders = async () => {
+  const loadOrders = async (role?: string) => {
     try {
-      const response = await orderApi.getByUser();
+      const response = role === 'ADMIN'
+        ? await orderApi.listAll()
+        : await orderApi.getByUser();
       const mappedOrders: Order[] = response.map((o: any) => ({
         id: String(o.id),
         userId: String(o.clienteId || ''),
@@ -282,7 +290,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
  
-      await Promise.all([loadCart(), loadOrders()]);
+      await Promise.all([loadCart(), loadOrders(userData.role)]);
     } catch (error) {
       console.error('Login failed:', error);
     }

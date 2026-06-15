@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, type Address, type PaymentMethod } from '../context/AppContext';
 import { CheckCircle, CreditCard, Banknote, Wallet } from 'lucide-react';
@@ -54,10 +54,11 @@ export default function Checkout() {
     }
   };
  
+  useEffect(() => {
   if (cart.length === 0) {
     navigate('/cart');
-    return null;
   }
+}, [cart, navigate]);
  
   return (
 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
