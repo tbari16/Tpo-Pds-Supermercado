@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Check, X } from 'lucide-react';
 
 export default function Register() {
+  const { register } = useApp();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -48,38 +49,14 @@ export default function Register() {
     setLoading(true);
     try {
       // 1. Petición POST al backend con la estructura exacta que espera Java
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre: formData.firstName,
-          apellido: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-          rol: "CLIENTE", // Le decimos al backend qué tipo de usuario es
-          direccionEnvio: formData.direccionEnvio,
-          telefono: formData.telefono || ""
-        })
-      });
-
-      // 2. Manejo de errores (ej. si el correo ya existe en la BD)
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.mensaje || 'Error al crear la cuenta. Intenta con otro correo.');
-      }
-
-      // 3. Obtenemos el token que el backend nos da al registrarnos
-      const data = await response.json();
-
-      // 4. Guardamos el token para que el usuario ya quede logueado
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        if (data.usuario) {
-          localStorage.setItem('usuario', JSON.stringify(data.usuario));
-        }
-      }
+      await register({
+    firstName: formData.firstName,
+    lastName: formData.lastName,
+    email: formData.email,
+    password: formData.password,
+    direccionEnvio: formData.direccionEnvio,
+    telefono: formData.telefono || '',
+});
 
       toast.success('Cuenta creada exitosamente');
       navigate('/products'); // Lo mandamos directo a comprar

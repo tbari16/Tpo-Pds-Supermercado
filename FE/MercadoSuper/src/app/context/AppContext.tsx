@@ -84,7 +84,7 @@ export type Category = {
 type AppContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; firstName: string; lastName: string }) => Promise<void>;
+  register: (data: { email: string; password: string; firstName: string; lastName: string; direccionEnvio?: string; telefono?: string }) => Promise<void>;
   logout: () => Promise<void>;
   cart: CartItem[];
   addToCart: (product: Product, quantity: number) => Promise<void>;
@@ -210,7 +210,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: item.productoNombre,
           description: '',
           price: item.precioUnitario,
-          stock: 0,
+          stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
           unit: 'UNIDAD',
           imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
           categoryId: '',
@@ -241,7 +241,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             name: item.productoNombre,
             description: '',
             price: item.precioUnitario,
-            stock: 0,
+           stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
             unit: 'UNIDAD',
             imageUrl: '',
             categoryId: '',
@@ -350,7 +350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: item.productoNombre,
           description: '',
           price: item.precioUnitario,
-          stock: 0,
+          stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
           unit: 'UNIDAD',
           imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
           categoryId: '',
@@ -376,7 +376,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: item.productoNombre,
           description: '',
           price: item.precioUnitario,
-          stock: 0,
+          stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
           unit: 'UNIDAD',
           imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
           categoryId: '',
@@ -407,7 +407,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: item.productoNombre,
           description: '',
           price: item.precioUnitario,
-          stock: 0,
+          stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
           unit: 'UNIDAD',
           imageUrl: item.imagenUrl || 'https://via.placeholder.com/400',
           categoryId: '',
@@ -454,7 +454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             name: item.productoNombre,
             description: '',
             price: item.precioUnitario,
-            stock: 0,
+            stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
             unit: 'UNIDAD',
             imageUrl: '',
             categoryId: '',
