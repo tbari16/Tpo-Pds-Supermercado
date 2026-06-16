@@ -11,6 +11,20 @@ const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string }> = {
   ENTREGADO: { bg: 'bg-green-100', text: 'text-green-700' },
   CANCELADO: { bg: 'bg-gray-100', text: 'text-gray-700' },
 };
+
+const getNextStatuses = (status: OrderStatus): OrderStatus[] => {
+  switch (status) {
+    case 'PENDIENTE':
+      return ['PENDIENTE', 'PAGADO', 'CANCELADO'];
+    case 'PAGADO':
+      return ['PAGADO', 'ENVIADO', 'CANCELADO'];
+    case 'ENVIADO':
+      return ['ENVIADO', 'ENTREGADO'];
+    case 'ENTREGADO':
+    case 'CANCELADO':
+      return [status];
+  }
+};
  
 export default function AdminOrders() {
   const { orders, updateOrderStatus } = useApp();
@@ -44,10 +58,14 @@ export default function AdminOrders() {
     return filtered;
   }, [orders, searchQuery, statusFilter, paymentFilter, sortBy]);
  
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (confirm(`¿Cambiar el estado del pedido a ${newStatus}?`)) {
-      updateOrderStatus(orderId, newStatus);
-      toast.success('Estado actualizado');
+      try {
+        await updateOrderStatus(orderId, newStatus);
+        toast.success('Estado actualizado');
+      } catch (error) {
+        toast.error('No se pudo actualizar el estado');
+      }
     }
   };
  
@@ -166,11 +184,9 @@ export default function AdminOrders() {
                         STATUS_COLORS[order.status].bg
                       } ${STATUS_COLORS[order.status].text}`}
 >
-<option value="PENDIENTE">PENDIENTE</option>
-<option value="CONFIRMADO">CONFIRMADO</option>
-<option value="ENVIADO">ENVIADO</option>
-<option value="ENTREGADO">ENTREGADO</option>
-<option value="CANCELADO">CANCELADO</option>
+                      {getNextStatuses(order.status).map((status) => (
+<option key={status} value={status}>{status}</option>
+                      ))}
 </select>
 </td>
 <td className="py-3 px-4">

@@ -23,7 +23,15 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminOrderDetail from './pages/admin/AdminOrderDetail';
 
-function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+function ProtectedRoute({
+  children,
+  adminOnly = false,
+  clientOnly = false,
+}: {
+  children: React.ReactNode;
+  adminOnly?: boolean;
+  clientOnly?: boolean;
+}) {
   const { user } = useApp();
 
   if (!user) {
@@ -32,6 +40,10 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 
   if (adminOnly && user.role !== 'ADMIN') {
     return <Navigate to="/products" replace />;
+  }
+
+  if (clientOnly && user.role === 'ADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -53,7 +65,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/products" replace />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
       <Route
         path="/login"
@@ -82,7 +94,7 @@ function AppRoutes() {
 
       <Route
         element={
-          <ProtectedRoute>
+          <ProtectedRoute clientOnly>
             <ClientLayout />
           </ProtectedRoute>
         }
@@ -111,9 +123,10 @@ function AppRoutes() {
         <Route path="categories" element={<AdminCategories />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="orders/:id" element={<AdminOrderDetail />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/products" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

@@ -6,6 +6,7 @@ import {
   cartApi,
   checkoutApi,
   orderApi,
+  notificationApi,
   setAuthToken,
   removeAuthToken,
 } from '../../lib/api';
@@ -68,8 +69,15 @@ export type Notification = {
   id: string;
   message: string;
   type: 'order' | 'status' | 'stock' | 'promo';
+  channel?: 'EMAIL' | 'PUSH' | 'SMS';
   read: boolean;
   timestamp: string;
+};
+
+export type NotificationPreferences = {
+  EMAIL: boolean;
+  PUSH: boolean;
+  SMS: boolean;
 };
  
 export type Category = {
@@ -77,6 +85,7 @@ export type Category = {
   name: string;
   description?: string;
   parentId?: string;
+  leaf?: boolean;
   active: boolean;
   productCount: number;
 };
@@ -96,6 +105,8 @@ type AppContextType = {
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   notifications: Notification[];
   markNotificationAsRead: (id: string) => void;
+  notificationPreferences: NotificationPreferences;
+  updateNotificationPreferences: (preferences: NotificationPreferences) => void;
   products: Product[];
   categories: Category[];
   addProduct: (product: Omit<Product, 'id' | 'dateAdded'>) => Promise<void>;
@@ -113,6 +124,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => {
+    const saved = localStorage.getItem('notification_preferences');
+    return saved
+      ? JSON.parse(saved)
+      : { EMAIL: true, PUSH: true, SMS: true };
+  });
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +137,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     initializeApp();
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'CLIENT') {
+      return;
+    }
+
+    loadNotifications();
+    const intervalId = window.setInterval(loadNotifications, 15000);
+    return () => window.clearInterval(intervalId);
+  }, [user?.role, notificationPreferences]);
  
   const initializeApp = async () => {
     try {
@@ -132,7 +159,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (token && userData) {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
-        await Promise.all([loadProducts(), loadCategories(), loadCart(), loadOrders(parsedUser.role)]);
+        await Promise.all([
+          loadProducts(),
+          loadCategories(),
+          loadCart(),
+          loadOrders(parsedUser.role),
+          parsedUser.role === 'CLIENT' ? loadNotifications() : Promise.resolve(),
+        ]);
       } else {
         await Promise.all([loadProducts(), loadCategories()]);
       }
@@ -182,6 +215,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: c.nombre,
           description: c.descripcion,
           parentId: c.categoriaPadreId ? String(c.categoriaPadreId) : undefined, // ← era c.padreId
+          leaf: c.hoja,
           active: true,
           productCount: c.cantidadProductos || 0, // ← era c.productCount
         });
@@ -290,7 +324,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
  
-      await Promise.all([loadCart(), loadOrders(userData.role)]);
+      await Promise.all([
+        loadCart(),
+        loadOrders(userData.role),
+        userData.role === 'CLIENT' ? loadNotifications() : Promise.resolve(),
+      ]);
     } catch (error) {
       console.error('Login failed:', error);
     }
@@ -317,7 +355,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       localStorage.setItem('user_data', JSON.stringify(userData));
  
-      await Promise.all([loadCart(), loadOrders()]);
+      await Promise.all([loadCart(), loadOrders(), loadNotifications()]);
     } catch (error) {
       console.error('Register failed:', error);
       throw error;
@@ -332,6 +370,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       setCart([]);
+      setNotifications([]);
       removeAuthToken();
       localStorage.removeItem('user_data');
     }
@@ -475,6 +514,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
  
       setOrders((prev) => [newOrder, ...prev]);
       setCart([]);
+      await loadNotifications();
  
       return newOrder;
     } catch (error) {
@@ -489,21 +529,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
  
       const updatedOrder: Order = {
         id: String(response.id),
-        userId: String(response.usuario?.id || ''),
-        userName: `${response.usuario?.nombre} ${response.usuario?.apellido}` || '',
+        userId: String(response.clienteId || ''),
+        userName: response.clienteNombre || '',
         items: response.items.map((item: any) => ({
   product: {
-    id: String(item.productoId || item.producto?.id || ''),
-    name: item.productoNombre || item.producto?.nombre || '',
-    description: item.producto?.descripcion || '',
-    price: item.precioUnitario || item.producto?.precio || 0,
-    stock: item.producto?.stock || 0,
-    unit: item.producto?.unidad || 'UNIDAD',
-    imageUrl: item.producto?.imagenUrl || 'https://via.placeholder.com/400',
-    categoryId: String(item.producto?.categoria?.id || ''),
-    categoryName: item.producto?.categoria?.nombre || '',
-    active: item.producto?.activo ?? true,
-    dateAdded: item.producto?.fechaCreacion || new Date().toISOString(),
+    id: String(item.productoId || ''),
+    name: item.productoNombre || '',
+    description: '',
+    price: item.precioUnitario || 0,
+    stock: products.find(p => p.id === String(item.productoId))?.stock ?? 0,
+    unit: products.find(p => p.id === String(item.productoId))?.unit || 'UNIDAD',
+    imageUrl: products.find(p => p.id === String(item.productoId))?.imageUrl || 'https://via.placeholder.com/400',
+    categoryId: products.find(p => p.id === String(item.productoId))?.categoryId || '',
+    categoryName: products.find(p => p.id === String(item.productoId))?.categoryName || '',
+    active: true,
+    dateAdded: new Date().toISOString(),
   },
   quantity: item.cantidad,
 })),
@@ -512,15 +552,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         paymentMethod: response.metodoPago as PaymentMethod,
         paymentReference: response.referenciaPago,
         shippingAddress: {
-          street: response.direccion?.calle || '',
-          city: response.direccion?.ciudad || '',
-          state: response.direccion?.estado || '',
-          postalCode: response.direccion?.codigoPostal || '',
-          country: response.direccion?.pais || '',
-          notes: response.direccion?.notas,
+          street: response.direccionEnvio || '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: '',
         },
-        createdAt: response.fechaCreacion,
-        updatedAt: response.fechaActualizacion,
+        createdAt: response.fechaPedido,
+        updatedAt: response.fechaPedido,
       };
  
       setOrders((prev) =>
@@ -528,6 +567,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     } catch (error) {
       console.error('Failed to update order status:', error);
+      throw error;
+    }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const response = await notificationApi.list();
+      const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]') as string[];
+      const mappedNotifications: Notification[] = response.map((n: any) => ({
+        id: String(n.id),
+        message: n.mensaje,
+        type: 'status',
+        channel: n.tipo,
+        read: readIds.includes(String(n.id)),
+        timestamp: n.fechaEnvio,
+      })).filter((notification) =>
+        notification.channel ? notificationPreferences[notification.channel] : true
+      );
+      setNotifications(mappedNotifications);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
     }
   };
  
@@ -543,9 +603,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
  
   const markNotificationAsRead = (id: string) => {
+    const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]') as string[];
+    if (!readIds.includes(id)) {
+      localStorage.setItem('read_notification_ids', JSON.stringify([...readIds, id]));
+    }
     setNotifications((prev) =>
       prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif))
     );
+  };
+
+  const updateNotificationPreferences = (preferences: NotificationPreferences) => {
+    setNotificationPreferences(preferences);
+    localStorage.setItem('notification_preferences', JSON.stringify(preferences));
   };
  
   const addProduct = async (product: Omit<Product, 'id' | 'dateAdded'>) => {
@@ -654,7 +723,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       nombre: category.name,
       descripcion: category.description,
       padreId: category.parentId ? Number(category.parentId) : null,
-      hoja: true,
+      hoja: category.leaf ?? true,
     } as any);
 
     // En vez de usar response.id (que viene null), recargamos todo
@@ -688,7 +757,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
  
   const deleteCategory = async (id: string) => {
-    throw new Error('Delete category is not supported by the backend');
+    try {
+      await categoryApi.delete(id);
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      throw error;
+    }
   };
  
   return (
@@ -708,6 +783,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateOrderStatus,
         notifications,
         markNotificationAsRead,
+        notificationPreferences,
+        updateNotificationPreferences,
         products,
         categories,
         addProduct,

@@ -171,7 +171,7 @@ export const productApi = {
   updateStock: async (id: string | number, stock: number) => {
     const response = await fetchWithAuth(`/admin/productos/${id}/stock`, {
       method: 'PUT',
-      body: JSON.stringify({ stock }),
+      body: JSON.stringify({ cantidad: stock }),
     });
     return response.json();
   },
@@ -207,6 +207,12 @@ export const categoryApi = {
       body: JSON.stringify(data),
     });
     return response.json();
+  },
+
+  delete: async (id: string | number) => {
+    await fetchWithAuth(`/admin/categorias/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
  
@@ -299,6 +305,14 @@ export const orderApi = {
       method: 'PUT',
       body: JSON.stringify({ nuevoEstado }),
     });
+    return response.json();
+  },
+};
+
+// ==================== NOTIFICATION ENDPOINTS ====================
+export const notificationApi = {
+  list: async () => {
+    const response = await fetchWithAuth('/notificaciones');
     return response.json();
   },
 };

@@ -4,7 +4,7 @@ import { ShoppingCart, Bell, User, LogOut, Menu, Search } from 'lucide-react';
 import { useState } from 'react';
 
 export default function ClientLayout() {
-  const { user, logout, cart, notifications } = useApp();
+  const { user, logout, cart, notifications, markNotificationAsRead } = useApp();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
@@ -79,6 +79,7 @@ export default function ClientLayout() {
                         {notifications.slice(0, 10).map((notif) => (
                           <div
                             key={notif.id}
+                            onMouseEnter={() => markNotificationAsRead(notif.id)}
                             className={`p-4 border-b border-gray-100 hover:bg-gray-50 ${
                               !notif.read ? 'bg-blue-50' : ''
                             }`}
@@ -113,7 +114,7 @@ export default function ClientLayout() {
                   <span className="hidden md:inline font-medium">{user?.firstName}</span>
                 </button>
 
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-[#E2E8F0] hidden group-hover:block">
+                <div className="absolute right-0 top-full w-48 bg-white rounded-xl shadow-lg border border-[#E2E8F0] hidden group-hover:block">
                   <Link
                     to="/profile"
                     className="block px-4 py-2 text-[#1E293B] hover:bg-[#F8FAFC] rounded-t-xl"

@@ -11,11 +11,25 @@ const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string }> = {
   ENTREGADO: { bg: 'bg-green-100', text: 'text-green-700' },
   CANCELADO: { bg: 'bg-gray-100', text: 'text-gray-700' },
 };
+
+const getNextStatuses = (status: OrderStatus): OrderStatus[] => {
+  switch (status) {
+    case 'PENDIENTE':
+      return ['PENDIENTE', 'PAGADO', 'CANCELADO'];
+    case 'PAGADO':
+      return ['PAGADO', 'ENVIADO', 'CANCELADO'];
+    case 'ENVIADO':
+      return ['ENVIADO', 'ENTREGADO'];
+    case 'ENTREGADO':
+    case 'CANCELADO':
+      return [status];
+  }
+};
  
 export default function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const { orders, updateOrderStatus } = useApp();
-  const [newStatus, setNewStatus] = useState<OrderStatus>('PENDIENTE');
+  const [newStatus, setNewStatus] = useState<OrderStatus | ''>('');
  
   const order = orders.find((o) => o.id === id);
  
@@ -30,14 +44,19 @@ export default function AdminOrderDetail() {
     );
   }
  
-  const handleUpdateStatus = () => {
-    if (newStatus === order.status) {
+  const handleUpdateStatus = async () => {
+    const selectedStatus = newStatus || order.status;
+    if (selectedStatus === order.status) {
       toast.error('Selecciona un estado diferente');
       return;
     }
     if (confirm(`¿Cambiar el estado del pedido a ${newStatus}?`)) {
-      updateOrderStatus(order.id, newStatus);
-      toast.success('Estado actualizado correctamente');
+      try {
+        await updateOrderStatus(order.id, selectedStatus);
+        toast.success('Estado actualizado correctamente');
+      } catch (error) {
+        toast.error('No se pudo actualizar el estado');
+      }
     }
   };
  
@@ -79,15 +98,13 @@ export default function AdminOrderDetail() {
 <h3 className="font-semibold text-gray-900 mb-3">Actualizar Estado del Pedido</h3>
 <div className="flex gap-4">
 <select
-              value={newStatus}
+              value={newStatus || order.status}
               onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
 >
-<option value="PENDIENTE">PENDIENTE</option>
-<option value="PAGADO">PAGADO</option>
-<option value="ENVIADO">ENVIADO</option>
-<option value="ENTREGADO">ENTREGADO</option>
-<option value="CANCELADO">CANCELADO</option>
+              {getNextStatuses(order.status).map((status) => (
+<option key={status} value={status}>{status}</option>
+              ))}
 </select>
 <button
               onClick={handleUpdateStatus}

@@ -7,13 +7,17 @@ export default function AdminCategories() {
   const { categories, addCategory, updateCategory, deleteCategory } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-
-  // Adaptado al backend: Quitamos "active" del estado del formulario
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     parentId: '',
   });
+
+  const categoryHasChildren = (categoryId: string) =>
+    categories.some((category) => category.parentId === categoryId);
+
+  const canDeleteCategory = (category: Category) =>
+    category.productCount === 0 && !categoryHasChildren(category.id);
 
   const handleOpenModal = (category?: Category) => {
     if (category) {
@@ -25,11 +29,7 @@ export default function AdminCategories() {
       });
     } else {
       setEditingCategory(null);
-      setFormData({
-        name: '',
-        description: '',
-        parentId: '',
-      });
+      setFormData({ name: '', description: '', parentId: '' });
     }
     setShowModal(true);
   };
@@ -39,7 +39,7 @@ export default function AdminCategories() {
     setEditingCategory(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name) {
@@ -48,37 +48,39 @@ export default function AdminCategories() {
     }
 
     const categoryData = {
-  name: formData.name,
-  description: formData.description || undefined,
-  parentId: formData.parentId || undefined,
-  active: editingCategory ? editingCategory.active : true,
-};
+      name: formData.name,
+      description: formData.description || undefined,
+      parentId: formData.parentId || undefined,
+      active: editingCategory ? editingCategory.active : true,
+    };
 
-    if (editingCategory) {
-      updateCategory(editingCategory.id, categoryData);
-      toast.success('Categoría actualizada');
-    } else {
-      addCategory(categoryData);
-      toast.success('Categoría creada');
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, categoryData);
+        toast.success('Categoria actualizada');
+      } else {
+        await addCategory(categoryData);
+        toast.success('Categoria creada');
+      }
+      handleCloseModal();
+    } catch (error) {
+      toast.error('No se pudo guardar la categoria');
     }
-
-    handleCloseModal();
   };
 
-  const handleDelete = (category: Category) => {
-    if (category.productCount > 0) {
-      if (
-        !confirm(
-          `Esta categoría tiene ${category.productCount} productos asociados. Los productos se desactivarán. ¿Continuar?`
-        )
-      ) {
-        return;
-      }
+  const handleDelete = async (category: Category) => {
+    if (!canDeleteCategory(category)) {
+      toast.error('Solo se pueden eliminar categorias sin productos ni subcategorias');
+      return;
     }
 
-    if (confirm(`¿Estás seguro de eliminar "${category.name}"?`)) {
-      deleteCategory(category.id);
-      toast.success('Categoría eliminada');
+    if (confirm(`Eliminar la categoria "${category.name}"?`)) {
+      try {
+        await deleteCategory(category.id);
+        toast.success('Categoria eliminada');
+      } catch (error) {
+        toast.error('No se pudo eliminar la categoria');
+      }
     }
   };
 
@@ -86,15 +88,15 @@ export default function AdminCategories() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Categorías</h1>
-          <p className="text-gray-600">Gestiona las categorías de productos</p>
+          <h1 className="text-3xl font-bold text-gray-900">Categorias</h1>
+          <p className="text-gray-600">Gestiona las categorias de productos</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="w-5 h-5" />
-          Nueva Categoría
+          Nueva Categoria
         </button>
       </div>
 
@@ -103,73 +105,87 @@ export default function AdminCategories() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left py-3 px-4 font-semibold text-gray-900">Categoría</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-900">Descripción</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-900">Categoria</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-900">Descripcion</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-900">Productos</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-900">Estado</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-900">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {categories.map((category) => (
-                <tr key={category.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <FolderTree className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">{category.name}</p>
-                        {category.parentId && (
-                          <p className="text-xs text-gray-500">
-                            Subcategoría de{' '}
-                            {categories.find((c) => c.id === category.parentId)?.name}
-                          </p>
-                        )}
+              {categories.map((category) => {
+                const deletable = canDeleteCategory(category);
+
+                return (
+                  <tr key={category.id} className="hover:bg-gray-50">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <FolderTree className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900">{category.name}</p>
+                          {category.parentId && (
+                            <p className="text-xs text-gray-500">
+                              Subcategoria de {categories.find((c) => c.id === category.parentId)?.name}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="text-sm text-gray-600">
-                      {category.description || 'Sin descripción'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="text-sm text-gray-700">
-                      {category.productCount} productos
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        category.active
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {category.active ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenModal(category)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-gray-600">
+                        {category.description || 'Sin descripcion'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-gray-700">
+                        {category.productCount} productos
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          category.active
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
                       >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(category)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {category.active ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenModal(category)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                          title="Editar categoria"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category)}
+                          disabled={!deletable}
+                          className={`p-2 rounded ${
+                            deletable
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-gray-300 cursor-not-allowed'
+                          }`}
+                          title={
+                            deletable
+                              ? 'Eliminar categoria'
+                              : 'Solo se pueden eliminar categorias sin productos ni subcategorias'
+                          }
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {categories.length === 0 && (
-            <div className="text-center py-12 text-gray-500">No hay categorías</div>
+            <div className="text-center py-12 text-gray-500">No hay categorias</div>
           )}
         </div>
       </div>
@@ -179,7 +195,7 @@ export default function AdminCategories() {
           <div className="bg-white rounded-lg max-w-lg w-full">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900">
-                {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+                {editingCategory ? 'Editar Categoria' : 'Nueva Categoria'}
               </h2>
               <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
@@ -189,7 +205,7 @@ export default function AdminCategories() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de la Categoría *
+                  Nombre de la categoria *
                 </label>
                 <input
                   type="text"
@@ -202,29 +218,29 @@ export default function AdminCategories() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descripción (Opcional)
+                  Descripcion (opcional)
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Descripción breve de la categoría"
+                  placeholder="Descripcion breve de la categoria"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Categoría Padre (Opcional)
+                  Categoria padre (opcional)
                 </label>
                 <select
                   value={formData.parentId}
                   onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Ninguna (Categoría Principal)</option>
+                  <option value="">Ninguna (categoria principal)</option>
                   {categories
-                    .filter((c) => c.id !== editingCategory?.id && !c.parentId)
+                    .filter((c) => c.id !== editingCategory?.id && !c.parentId && !c.leaf)
                     .map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
@@ -245,7 +261,7 @@ export default function AdminCategories() {
                   type="submit"
                   className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {editingCategory ? 'Actualizar' : 'Crear'} Categoría
+                  {editingCategory ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>

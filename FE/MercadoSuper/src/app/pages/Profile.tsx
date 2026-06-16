@@ -4,7 +4,7 @@ import { User, Mail, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Profile() {
-  const { user } = useApp();
+  const { user, notificationPreferences, updateNotificationPreferences } = useApp();
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
@@ -38,6 +38,13 @@ export default function Profile() {
     await new Promise((resolve) => setTimeout(resolve, 500));
     toast.success('Contraseña actualizada correctamente');
     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
+  const toggleNotificationPreference = (channel: 'EMAIL' | 'PUSH' | 'SMS') => {
+    updateNotificationPreferences({
+      ...notificationPreferences,
+      [channel]: !notificationPreferences[channel],
+    });
   };
 
   return (
@@ -224,28 +231,43 @@ export default function Profile() {
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Preferencias</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Preferencias de notificacion</h2>
           <div className="space-y-4">
             <label className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-900">Notificaciones por correo</p>
-                <p className="text-sm text-gray-500">Recibe actualizaciones de tus pedidos</p>
+                <p className="font-medium text-gray-900">Email</p>
+                <p className="text-sm text-gray-500">Mostrar notificaciones generadas por el observador de email</p>
               </div>
               <input
                 type="checkbox"
-                defaultChecked
+                checked={notificationPreferences.EMAIL}
+                onChange={() => toggleNotificationPreference('EMAIL')}
                 className="w-12 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer transition-colors checked:bg-blue-600 before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6"
               />
             </label>
 
             <label className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-900">Promociones y ofertas</p>
-                <p className="text-sm text-gray-500">Recibe nuestras mejores ofertas</p>
+                <p className="font-medium text-gray-900">Push</p>
+                <p className="text-sm text-gray-500">Mostrar notificaciones generadas por el observador push</p>
               </div>
               <input
                 type="checkbox"
-                defaultChecked
+                checked={notificationPreferences.PUSH}
+                onChange={() => toggleNotificationPreference('PUSH')}
+                className="w-12 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer transition-colors checked:bg-blue-600 before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6"
+              />
+            </label>
+
+            <label className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-900">SMS</p>
+                <p className="text-sm text-gray-500">Mostrar notificaciones generadas por el observador SMS</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={notificationPreferences.SMS}
+                onChange={() => toggleNotificationPreference('SMS')}
                 className="w-12 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer transition-colors checked:bg-blue-600 before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6"
               />
             </label>

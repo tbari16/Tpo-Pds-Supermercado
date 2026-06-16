@@ -84,7 +84,7 @@ export default function AdminDashboard() {
               const percentage = (count / totalOrders) * 100;
               const colors: Record<string, string> = {
                 PENDIENTE: 'bg-orange-500',
-                CONFIRMADO: 'bg-blue-500',
+                PAGADO: 'bg-blue-500',
                 ENVIADO: 'bg-cyan-500',
                 ENTREGADO: 'bg-green-500',
                 CANCELADO: 'bg-gray-500',
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
                       className={`text-xs px-2 py-1 rounded-full ${
                         order.status === 'PENDIENTE'
                           ? 'bg-orange-100 text-orange-700'
-                          : order.status === 'CONFIRMADO'
+                          : order.status === 'PAGADO'
                           ? 'bg-blue-100 text-blue-700'
                           : order.status === 'ENVIADO'
                           ? 'bg-cyan-100 text-cyan-700'

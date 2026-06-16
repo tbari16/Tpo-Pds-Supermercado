@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   LogOut,
   Menu,
+  User,
   X,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -25,7 +26,7 @@ export default function AdminLayout() {
   const menuItems = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/products', label: 'Productos', icon: Package },
-    { path: '/admin/categories', label: 'Categorías', icon: FolderTree },
+    { path: '/admin/categories', label: 'Categorias', icon: FolderTree },
     { path: '/admin/orders', label: 'Pedidos', icon: ShoppingBag },
   ];
 
@@ -72,29 +73,6 @@ export default function AdminLayout() {
             );
           })}
         </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#E2E8F0]">
-          <div className="flex items-center gap-3 px-4 py-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2563EB] to-[#22C55E] flex items-center justify-center">
-              <span className="text-white font-semibold">
-                {user?.firstName?.[0]}{user?.lastName?.[0]}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-[#1E293B] truncate">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-sm text-[#64748B] truncate">{user?.email}</p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Cerrar Sesión</span>
-          </button>
-        </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -106,6 +84,29 @@ export default function AdminLayout() {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex-1" />
+
+          <div className="relative group">
+            <button className="flex items-center gap-2 p-2 text-[#1E293B] hover:text-[#2563EB] hover:bg-[#F8FAFC] rounded-xl">
+              <User className="w-6 h-6" />
+              <span className="hidden md:inline font-medium">{user?.firstName}</span>
+            </button>
+
+            <div className="absolute right-0 top-full w-48 bg-white rounded-xl shadow-lg border border-[#E2E8F0] hidden group-hover:block z-50">
+              <Link
+                to="/admin/profile"
+                className="block px-4 py-2 text-[#1E293B] hover:bg-[#F8FAFC] rounded-t-xl"
+              >
+                Mi Cuenta
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-red-600 hover:bg-[#FEF2F2] rounded-b-xl flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">

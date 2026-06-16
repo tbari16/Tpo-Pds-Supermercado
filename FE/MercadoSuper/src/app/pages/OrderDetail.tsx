@@ -4,13 +4,13 @@ import { ArrowLeft, Package, MapPin, CreditCard, CheckCircle } from 'lucide-reac
 
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string }> = {
   PENDIENTE: { bg: 'bg-orange-100', text: 'text-orange-700' },
-  CONFIRMADO: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  PAGADO: { bg: 'bg-blue-100', text: 'text-blue-700' },
   ENVIADO: { bg: 'bg-cyan-100', text: 'text-cyan-700' },
   ENTREGADO: { bg: 'bg-green-100', text: 'text-green-700' },
   CANCELADO: { bg: 'bg-gray-100', text: 'text-gray-700' },
 };
 
-const STATUS_ORDER: OrderStatus[] = ['PENDIENTE', 'CONFIRMADO', 'ENVIADO', 'ENTREGADO'];
+const STATUS_ORDER: OrderStatus[] = ['PENDIENTE', 'PAGADO', 'ENVIADO', 'ENTREGADO'];
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -194,7 +194,7 @@ export default function OrderDetail() {
         <button className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
           Volver a Pedir
         </button>
-        {(order.status === 'PENDIENTE' || order.status === 'CONFIRMADO') && (
+        {(order.status === 'PENDIENTE' || order.status === 'PAGADO') && (
           <button className="flex-1 px-6 py-3 text-red-600 border border-red-600 rounded-lg hover:bg-red-50">
             Cancelar Pedido
           </button>

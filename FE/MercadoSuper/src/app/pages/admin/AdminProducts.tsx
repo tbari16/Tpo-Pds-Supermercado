@@ -37,9 +37,14 @@ export default function AdminProducts() {
       return matchesSearch && matchesCategory && matchesStatus;
     });
   }, [products, searchQuery, categoryFilter, statusFilter]);
+
+  const leafCategories = categories.filter((category) => category.active && category.leaf);
  
   const handleOpenModal = (product?: Product) => {
     if (product) {
+      const currentCategory = categories.find((category) => category.id === product.categoryId);
+      const editableCategoryId = currentCategory?.leaf ? product.categoryId : '';
+
       setEditingProduct(product);
       setFormData({
         name: product.name,
@@ -49,10 +54,14 @@ export default function AdminProducts() {
         unit: product.unit,
         weight: product.weight?.toString() || '',
         imageUrl: product.imageUrl,
-        categoryId: product.categoryId,
-        categoryName: product.categoryName,
+        categoryId: editableCategoryId,
+        categoryName: currentCategory?.leaf ? product.categoryName : '',
         active: product.active,
       });
+
+      if (currentCategory && !currentCategory.leaf) {
+        toast.info('Este producto tenia una categoria padre. Selecciona una categoria hoja para actualizarlo.');
+      }
     } else {
       setEditingProduct(null);
       setFormData({
@@ -76,7 +85,7 @@ export default function AdminProducts() {
     setEditingProduct(null);
   };
  
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
  
     if (!formData.name || !formData.description || !formData.price || !formData.stock || !formData.categoryId) {
@@ -87,6 +96,11 @@ export default function AdminProducts() {
     const category = categories.find((c) => c.id === formData.categoryId);
     if (!category) {
       toast.error('Categoría no válida');
+      return;
+    }
+
+    if (!category.leaf) {
+      toast.error('Los productos solo pueden asociarse a categorías hoja');
       return;
     }
  
@@ -103,15 +117,19 @@ export default function AdminProducts() {
       active: formData.active,
     };
  
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productData);
-      toast.success('Producto actualizado');
-    } else {
-      addProduct(productData);
-      toast.success('Producto agregado');
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productData);
+        toast.success('Producto actualizado');
+      } else {
+        await addProduct(productData);
+        toast.success('Producto agregado');
+      }
+
+      handleCloseModal();
+    } catch (error) {
+      toast.error('No se pudo guardar el producto');
     }
- 
-    handleCloseModal();
   };
  
   const handleDelete = (product: Product) => {
@@ -314,7 +332,7 @@ export default function AdminProducts() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
 >
 <option value="">Seleccionar categoría</option>
-                  {categories.filter((c) => c.active).map((cat) => (
+                  {leafCategories.map((cat) => (
 <option key={cat.id} value={cat.id}>
                       {cat.name}
 </option>
