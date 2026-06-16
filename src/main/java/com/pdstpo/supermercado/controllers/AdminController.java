@@ -82,6 +82,12 @@ public class AdminController {
         return adminService.actualizarCategoria(categoriaId, request);
     }
 
+    @DeleteMapping("/categorias/{categoriaId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarCategoria(@PathVariable Long categoriaId) {
+        adminService.eliminarCategoria(categoriaId);
+    }
+
     @GetMapping("/pedidos")
     public List<PedidoResponse> listarPedidos() {
         return adminService.listarPedidos();

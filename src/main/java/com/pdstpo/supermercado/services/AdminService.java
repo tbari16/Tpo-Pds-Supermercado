@@ -60,7 +60,7 @@ public class AdminService {
 
     @Transactional
     public ProductoResponse altaProducto(ProductoRequest request) {
-        CategoriaHoja categoria = obtenerCategoriaHoja(request.categoriaId());
+        CategoriaComponente categoria = obtenerCategoriaHoja(request.categoriaId());
         Producto producto = new Producto(
                 request.nombre(),
                 request.descripcion(),
@@ -77,7 +77,7 @@ public class AdminService {
     @Transactional
     public ProductoResponse modificarProducto(Long productoId, ProductoRequest request) {
         Producto producto = obtenerProducto(productoId);
-        CategoriaHoja categoria = obtenerCategoriaHoja(request.categoriaId());
+        CategoriaComponente categoria = obtenerCategoriaHoja(request.categoriaId());
 
         producto.setNombre(request.nombre());
         producto.setDescripcion(request.descripcion());
@@ -132,6 +132,28 @@ public class AdminService {
         return CategoriaResponse.from(categoria);
     }
 
+    @Transactional
+    public void eliminarCategoria(Long categoriaId) {
+        CategoriaComponente categoria = obtenerCategoria(categoriaId);
+
+        if (categoria.calcularCantidadProductos() > 0) {
+            throw new BusinessException("No se puede eliminar una categoria con productos asociados");
+        }
+
+        if (categoria instanceof CategoriaCompuesta compuesta && !compuesta.getSubcategorias().isEmpty()) {
+            throw new BusinessException("No se puede eliminar una categoria con subcategorias");
+        }
+
+        CategoriaCompuesta padre = categoria.getPadre();
+        if (padre != null) {
+            padre.eliminar(categoria);
+            categoriaRepository.save(padre);
+            return;
+        }
+
+        categoriaRepository.delete(categoria);
+    }
+
     @Transactional(readOnly = true)
     public List<PedidoResponse> listarPedidos() {
         return pedidoRepository.findAll().stream()
@@ -183,10 +205,10 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria no encontrada"));
     }
 
-    private CategoriaHoja obtenerCategoriaHoja(Long categoriaId) {
+    private CategoriaComponente obtenerCategoriaHoja(Long categoriaId) {
         CategoriaComponente categoria = obtenerCategoria(categoriaId);
-        if (categoria instanceof CategoriaHoja hoja) {
-            return hoja;
+        if (categoria.esHoja()) {
+            return categoria;
         }
         throw new BusinessException("Los productos solo pueden asociarse a categorias hoja");
     }
